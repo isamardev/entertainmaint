@@ -18,8 +18,8 @@ After the screening, the cast and crew attended an exclusive after-party where t
 Stay tuned for more updates on this exciting new release as it hits theaters worldwide next month.',
   (SELECT id FROM cat_ids WHERE slug = 'celebrity'),
   'published', true, true, NOW() - INTERVAL '2 hours',
-  'https://picsum.photos/seed/celebrity1/1200/800',
-  'https://picsum.photos/seed/celebrity1/600/400'
+  'https://picsum.photos/seed/celebrity-red-carpet/1200/800',
+  'https://picsum.photos/seed/celebrity-red-carpet/600/400'
 ),
 -- 2. Movies & TV
 (
@@ -35,8 +35,8 @@ The streaming platform has already announced that a second season is in developm
 If you haven''t watched it yet, now is the perfect time to dive into this incredible series that everyone is talking about.',
   (SELECT id FROM cat_ids WHERE slug = 'movies-tv'),
   'published', false, false, NOW() - INTERVAL '1 day',
-  'https://picsum.photos/seed/tv1/1200/800',
-  'https://picsum.photos/seed/tv1/600/400'
+  'https://picsum.photos/seed/movie-theater/1200/800',
+  'https://picsum.photos/seed/movie-theater/600/400'
 ),
 -- 3. Music
 (
@@ -52,8 +52,8 @@ The tour announcement comes hot on the heels of the artist''s latest album, whic
 Make sure you get your tickets early – this is one show you won''t want to miss!',
   (SELECT id FROM cat_ids WHERE slug = 'music'),
   'published', true, false, NOW() - INTERVAL '1.5 days',
-  'https://picsum.photos/seed/music1/1200/800',
-  'https://picsum.photos/seed/music1/600/400'
+  'https://picsum.photos/seed/concert-stage/1200/800',
+  'https://picsum.photos/seed/concert-stage/600/400'
 ),
 -- 4. Style
 (
@@ -69,8 +69,8 @@ Key trends for the season include oversized outerwear, vibrant prints, sustainab
 Start planning your wardrobe update now – these trends are too good to miss!',
   (SELECT id FROM cat_ids WHERE slug = 'style'),
   'published', false, false, NOW() - INTERVAL '2 days',
-  'https://picsum.photos/seed/fashion1/1200/800',
-  'https://picsum.photos/seed/fashion1/600/400'
+  'https://picsum.photos/seed/fashion-runway/1200/800',
+  'https://picsum.photos/seed/fashion-runway/600/400'
 ),
 -- 5. Royals
 (
@@ -86,8 +86,8 @@ The gala was a tremendous success, exceeding all fundraising goals. The funds ra
 It was truly a night to remember, filled with elegance, generosity, and hope for the future.',
   (SELECT id FROM cat_ids WHERE slug = 'royals'),
   'published', false, false, NOW() - INTERVAL '2.5 days',
-  'https://picsum.photos/seed/royal1/1200/800',
-  'https://picsum.photos/seed/royal1/600/400'
+  'https://picsum.photos/seed/royal-gala/1200/800',
+  'https://picsum.photos/seed/royal-gala/600/400'
 ),
 -- 6. Sports
 (
@@ -103,6 +103,6 @@ This victory marks the team''s first championship in decades and cements their p
 Congratulations to the champions – you''ve earned it!',
   (SELECT id FROM cat_ids WHERE slug = 'sports'),
   'published', true, false, NOW() - INTERVAL '3 days',
-  'https://picsum.photos/seed/sports1/1200/800',
-  'https://picsum.photos/seed/sports1/600/400'
+  'https://picsum.photos/seed/sports-championship/1200/800',
+  'https://picsum.photos/seed/sports-championship/600/400'
 );

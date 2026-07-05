@@ -53,8 +53,8 @@ The film, which has been in production for over two years, is already generating
 After the screening, the cast and crew attended an exclusive after-party where they celebrated the successful premiere. The party featured live music, gourmet food, and plenty of champagne as guests toasted to the film's success.
 
 Stay tuned for more updates on this exciting new release as it hits theaters worldwide next month.`,
-    hero_image_hd: "https://picsum.photos/seed/celebrity1/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/celebrity1/600/400",
+    hero_image_hd: "https://picsum.photos/seed/celebrity-red-carpet/1200/800",
+    hero_image_lq: "https://picsum.photos/seed/celebrity-red-carpet/600/400",
     hero_caption: null,
     category_id: "cat-1",
     author_id: null,
@@ -79,8 +79,8 @@ Viewers have been raving about the incredible performances from the cast, the gr
 The streaming platform has already announced that a second season is in development, much to the delight of fans worldwide. Production is set to begin later this year, with the entire cast returning to reprise their roles.
 
 If you haven't watched it yet, now is the perfect time to dive into this incredible series that everyone is talking about.`,
-    hero_image_hd: "https://picsum.photos/seed/tv1/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/tv1/600/400",
+    hero_image_hd: "https://picsum.photos/seed/movie-theater/1200/800",
+    hero_image_lq: "https://picsum.photos/seed/movie-theater/600/400",
     hero_caption: null,
     category_id: "cat-2",
     author_id: null,
@@ -105,8 +105,8 @@ Tickets go on sale next week, and fans are already preparing for what is expecte
 The tour announcement comes hot on the heels of the artist's latest album, which has been dominating the charts since its release last month. The album has already spawned multiple number-one singles and shows no signs of slowing down.
 
 Make sure you get your tickets early – this is one show you won't want to miss!`,
-    hero_image_hd: "https://picsum.photos/seed/music1/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/music1/600/400",
+    hero_image_hd: "https://picsum.photos/seed/concert-stage/1200/800",
+    hero_image_lq: "https://picsum.photos/seed/concert-stage/600/400",
     hero_caption: null,
     category_id: "cat-3",
     author_id: null,
@@ -131,8 +131,8 @@ The week kicked off with stunning shows from established houses, showcasing ever
 Key trends for the season include oversized outerwear, vibrant prints, sustainable materials, and a return to bold accessories. Whether you prefer classic elegance or cutting-edge style, there's plenty of inspiration to be found in this season's collections.
 
 Start planning your wardrobe update now – these trends are too good to miss!`,
-    hero_image_hd: "https://picsum.photos/seed/fashion1/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/fashion1/600/400",
+    hero_image_hd: "https://picsum.photos/seed/fashion-runway/1200/800",
+    hero_image_lq: "https://picsum.photos/seed/fashion-runway/600/400",
     hero_caption: null,
     category_id: "cat-4",
     author_id: null,
@@ -157,8 +157,8 @@ The evening featured a dinner, live auction, and performances from world-renowne
 The gala was a tremendous success, exceeding all fundraising goals. The funds raised will go towards supporting education, healthcare, and community initiatives both locally and around the world.
 
 It was truly a night to remember, filled with elegance, generosity, and hope for the future.`,
-    hero_image_hd: "https://picsum.photos/seed/royal1/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/royal1/600/400",
+    hero_image_hd: "https://picsum.photos/seed/royal-gala/1200/800",
+    hero_image_lq: "https://picsum.photos/seed/royal-gala/600/400",
     hero_caption: null,
     category_id: "cat-5",
     author_id: null,
@@ -183,8 +183,8 @@ Fans in the stadium and around the world watched in awe as the team scored the w
 This victory marks the team's first championship in decades and cements their place in sports history. The players have already promised that this is just the beginning and that they'll be back next season to defend their title.
 
 Congratulations to the champions – you've earned it!`,
-    hero_image_hd: "https://picsum.photos/seed/sports1/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/sports1/600/400",
+    hero_image_hd: "https://picsum.photos/seed/sports-championship/1200/800",
+    hero_image_lq: "https://picsum.photos/seed/sports-championship/600/400",
     hero_caption: null,
     category_id: "cat-6",
     author_id: null,
@@ -207,8 +207,8 @@ Congratulations to the champions – you've earned it!`,
 The actor spoke candidly about the challenges and rewards of taking on such a unique role, and how they prepared for the part. They also shared their thoughts on the current state of the entertainment industry and what they hope to see in the future.
 
 This is one interview you won't want to miss – stay tuned for the full story coming soon!`,
-    hero_image_hd: "https://picsum.photos/seed/celebrity2/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/celebrity2/600/400",
+    hero_image_hd: "https://picsum.photos/seed/celebrity-portrait/1200/800",
+    hero_image_lq: "https://picsum.photos/seed/celebrity-portrait/600/400",
     hero_caption: null,
     category_id: "cat-1",
     author_id: null,
@@ -229,8 +229,8 @@ This is one interview you won't want to miss – stay tuned for the full story c
     body: `Summer is just around the corner, and that means it's time for the biggest movie season of the year! From explosive action films to touching dramas and hilarious comedies, there's something for everyone at the cinema this summer.
 
 We've rounded up all the must-see films coming out in the next few months, so you can plan your moviegoing schedule now. Get ready for an unforgettable summer at the movies!`,
-    hero_image_hd: "https://picsum.photos/seed/movie1/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/movie1/600/400",
+    hero_image_hd: "https://picsum.photos/seed/summer-movies/1200/800",
+    hero_image_lq: "https://picsum.photos/seed/summer-movies/600/400",
     hero_caption: null,
     category_id: "cat-2",
     author_id: null,
