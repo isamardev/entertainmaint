@@ -20,7 +20,7 @@ export function ArticleCard({ article, size = "md", horizontal = false }: Props)
             </picture>
           )}
           {article.is_breaking && (
-            <span className="absolute left-0 top-0 yellow-bar px-2 py-1 text-[0.65rem] font-black uppercase tracking-widest">Breaking</span>
+            <span className="absolute left-0 top-0 z-10 yellow-bar px-2 py-1 text-[0.65rem] font-black uppercase tracking-widest">Breaking</span>
           )}
         </div>
       </Link>

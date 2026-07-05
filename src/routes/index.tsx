@@ -42,7 +42,7 @@ function Home() {
                 <img src={featured.hero_image_hd} alt={featured.title}
                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
               )}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-5 md:p-8">
+              <div className="absolute inset-x-0 bottom-0 top-1/3 bg-gradient-to-t from-black via-black/70 to-transparent p-5 md:p-8">
                 {featured.category?.name && <div className="eyebrow mb-2">{featured.category.name}</div>}
                 <h1 className="display max-w-3xl text-3xl font-black leading-[0.95] md:text-5xl lg:text-6xl group-hover:text-yellow">
                   {featured.title}
@@ -51,7 +51,7 @@ function Home() {
                 <div className="meta mt-3">{timeAgo(featured.published_at)}</div>
               </div>
               {featured.is_breaking && (
-                <span className="absolute left-4 top-4 yellow-bar px-3 py-1 text-xs font-black uppercase tracking-widest">Breaking</span>
+                <span className="absolute left-4 top-4 z-10 yellow-bar px-3 py-1 text-xs font-black uppercase tracking-widest">Breaking</span>
               )}
             </div>
           </Link>
