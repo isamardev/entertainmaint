@@ -22,10 +22,10 @@ function AdminLayout() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <div className="mb-8 border-b-4 border-yellow pb-4">
+    <div className="mx-auto max-w-7xl px-0 py-4 md:px-4 md:py-8">
+      <div className="mb-6 border-b-4 border-yellow pb-4 md:mb-8">
         <div className="eyebrow">Entertainment Trends</div>
-        <h1 className="display text-3xl font-black uppercase">Admin Dashboard</h1>
+        <h1 className="display text-2xl font-black uppercase md:text-3xl">Admin Dashboard</h1>
       </div>
       <Outlet />
     </div>

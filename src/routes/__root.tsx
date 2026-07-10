@@ -10,7 +10,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { TrendingBar } from "@/components/site/TrendingBar";
-import { AdminSidebar } from "@/components/site/AdminSidebar";
+import { AdminShell } from "@/components/site/AdminShell";
 import { supabase } from "@/integrations/supabase/client";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 
@@ -76,12 +76,9 @@ function RootComponent() {
       <HelmetProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <div className="flex min-h-screen">
-              <AdminSidebar />
-              <main className="admin-panel flex-1 bg-black p-6">
-                <Outlet />
-              </main>
-            </div>
+            <AdminShell>
+              <Outlet />
+            </AdminShell>
           </AuthProvider>
         </QueryClientProvider>
       </HelmetProvider>
