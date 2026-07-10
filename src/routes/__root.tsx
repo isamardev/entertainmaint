@@ -1,5 +1,5 @@
 import {
-  Outlet, createRootRouteWithContext, HeadContent, Scripts, useRouter,
+  Outlet, createRootRouteWithContext, HeadContent, Scripts, useRouter, useLocation,
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
@@ -9,7 +9,8 @@ import appCss from "../styles.css?url";
 import { AuthProvider } from "@/context/AuthContext";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
-import { Ticker } from "@/components/site/Ticker";
+import { TrendingBar } from "@/components/site/TrendingBar";
+import { AdminSidebar } from "@/components/site/AdminSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 
@@ -57,6 +58,9 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
@@ -66,13 +70,31 @@ function RootComponent() {
     });
     return () => sub.subscription.unsubscribe();
   }, [router, queryClient]);
+
+  if (isAdminRoute) {
+    return (
+      <HelmetProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <div className="flex min-h-screen">
+              <AdminSidebar />
+              <main className="admin-panel flex-1 bg-black p-6">
+                <Outlet />
+              </main>
+            </div>
+          </AuthProvider>
+        </QueryClientProvider>
+      </HelmetProvider>
+    );
+  }
+
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <div className="flex min-h-screen flex-col">
-            <Ticker />
             <Navbar />
+            <TrendingBar />
             <main className="flex-1"><Outlet /></main>
             <Footer />
           </div>

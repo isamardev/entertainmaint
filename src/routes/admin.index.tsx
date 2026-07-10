@@ -17,9 +17,8 @@ function AdminArticles() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4">
         <h2 className="display text-xl font-black uppercase">All Articles</h2>
-        <Link to="/admin/new" className="yellow-bar px-3 py-1.5 text-xs font-black uppercase tracking-widest">+ New</Link>
       </div>
       {isLoading ? <div className="meta">Loading…</div> : (
         <div className="overflow-x-auto border border-border">

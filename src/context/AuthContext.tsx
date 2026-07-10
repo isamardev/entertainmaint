@@ -22,8 +22,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
+  // Temporary dev admin state
+  const [isDevAdmin, setIsDevAdmin] = useState(false);
 
   useEffect(() => {
+    // Check for dev admin in localStorage
+    const devAdmin = localStorage.getItem("dev_admin");
+    if (devAdmin === "true") {
+      setIsDevAdmin(true);
+      setRoles(["admin", "super_admin"]);
+      setLoading(false);
+      return;
+    }
+
     // Register listener first
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
@@ -48,13 +59,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value: AuthState = {
-    user: session?.user ?? null,
-    session,
+    user: isDevAdmin ? { id: "dev-admin-id", email: "admin@gmail.com" } as any : session?.user ?? null,
+    session: isDevAdmin ? {} as any : session,
     roles,
     loading,
-    isAdmin: roles.includes("admin") || roles.includes("super_admin"),
-    isSuperAdmin: roles.includes("super_admin"),
+    isAdmin: isDevAdmin || roles.includes("admin") || roles.includes("super_admin"),
+    isSuperAdmin: isDevAdmin || roles.includes("super_admin"),
     async signIn(email, password) {
+      // Temporary dev admin login
+      if (email === "admin@gmail.com" && password === "admin123") {
+        localStorage.setItem("dev_admin", "true");
+        setIsDevAdmin(true);
+        setRoles(["admin", "super_admin"]);
+        setLoading(false);
+        return { error: undefined };
+      }
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       return { error: error?.message };
     },
@@ -68,7 +87,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return { error: error?.message };
     },
-    async signOut() { await supabase.auth.signOut(); },
+    async signOut() { 
+      if (isDevAdmin) {
+        localStorage.removeItem("dev_admin");
+        setIsDevAdmin(false);
+        setRoles([]);
+        return;
+      }
+      await supabase.auth.signOut(); 
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

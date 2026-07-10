@@ -40,26 +40,26 @@
 
 :root {
   --radius: 0.25rem;
-  --background: oklch(0 0 0);              /* #000 */
-  --foreground: oklch(0.98 0 0);           /* near white */
-  --surface: oklch(0.16 0.005 260);        /* #131314 */
-  --surface-2: oklch(0.22 0.005 260);
-  --muted-foreground: oklch(0.72 0.01 260);
+  --background: oklch(1 0 0);              /* White background */
+  --foreground: oklch(0 0 0);             /* Black text */
+  --surface: oklch(0.97 0.005 260);       /* Light gray surface */
+  --surface-2: oklch(0.94 0.005 260);
+  --muted-foreground: oklch(0.45 0.01 260);
   --primary: oklch(0.87 0.17 92);          /* #FFCE1B yellow */
   --primary-foreground: oklch(0 0 0);
   --destructive: oklch(0.62 0.22 27);
-  --border: oklch(0.28 0.005 260);
+  --border: oklch(0.85 0.005 260);
 }
 
 .dark {
-  --background: oklch(0 0 0);
-  --foreground: oklch(0.98 0 0);
-  --surface: oklch(0.16 0.005 260);
-  --surface-2: oklch(0.22 0.005 260);
-  --muted-foreground: oklch(0.72 0.01 260);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0 0 0);
+  --surface: oklch(0.97 0.005 260);
+  --surface-2: oklch(0.94 0.005 260);
+  --muted-foreground: oklch(0.45 0.01 260);
   --primary: oklch(0.87 0.17 92);
   --primary-foreground: oklch(0 0 0);
-  --border: oklch(0.28 0.005 260);
+  --border: oklch(0.85 0.005 260);
 }
 
 @layer base {
@@ -92,6 +92,37 @@
 @utility yellow-bar {
   background: var(--color-primary);
   color: var(--color-primary-foreground);
+}
+
+/* Admin panel: dark theme overrides for forms, tables, and surfaces */
+.admin-panel {
+  --background: oklch(0.14 0 0);
+  --foreground: oklch(0.95 0 0);
+  --surface: oklch(0.18 0 0);
+  --surface-2: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.62 0.01 260);
+  --border: oklch(0.32 0.01 260);
+  color: var(--foreground);
+}
+
+.admin-panel input:not([type="checkbox"]):not([type="file"]):not([type="radio"]),
+.admin-panel textarea,
+.admin-panel select {
+  color: var(--foreground);
+}
+
+.admin-panel input::placeholder,
+.admin-panel textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+.admin-panel select option {
+  background: oklch(0.14 0 0);
+  color: oklch(0.95 0 0);
+}
+
+.admin-panel input[type="file"] {
+  color: var(--muted-foreground);
 }
 
 @utility ticker-track {
