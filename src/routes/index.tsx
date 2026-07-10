@@ -10,7 +10,7 @@ import { timeAgo } from "@/lib/format";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Entertainme — Celebrity, TV, Music, Style, Royals, Sports" },
+      { title: "Entertainment Trends — Celebrity, TV, Music, Style, Royals, Sports" },
       { name: "description", content: "Breaking entertainment news updated all day — celebrity, movies & TV, music, style, royals, sports." },
     ],
     links: [{ rel: "canonical", href: "/" }],
@@ -33,7 +33,7 @@ function Home() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
-      <Helmet><title>Entertainme — The Pulse of Pop Culture</title></Helmet>
+      <Helmet><title>Entertainment Trends — The Pulse of Pop Culture</title></Helmet>
 
       {/* Full Layout Starts Here - Sidebar from Beginning */}
       <div className="grid gap-10 lg:grid-cols-[1fr_320px]">

@@ -28,13 +28,14 @@ export function Navbar() {
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
 
-        <Link to="/" className="flex shrink-0 items-center gap-2">
-          {/* Logo placeholder slot — replace with <img src=... /> later */}
-          <div className="grid h-9 w-9 place-items-center border border-yellow bg-yellow font-display text-lg font-black text-black">
-            E
-          </div>
-          <span className="display text-xl font-black uppercase tracking-tight">
-            Entertain<span className="text-yellow">me</span>
+        <Link to="/" className="flex shrink-0 items-center gap-3">
+          <img
+            src="/logo.png"
+            alt="Entertainment Trends"
+            className="h-11 w-11 object-contain"
+          />
+          <span className="display hidden text-lg font-black uppercase tracking-tight sm:inline">
+            Entertainment <span className="text-yellow">Trends</span>
           </span>
         </Link>
 
@@ -82,7 +83,7 @@ export function Navbar() {
             <Search size={18} className="text-yellow" />
             <input
               autoFocus value={q} onChange={(e) => setQ(e.target.value)}
-              placeholder="Search Entertainme…"
+              placeholder="Search Entertainment Trends…"
               className="flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
             />
             <button type="submit" className="yellow-bar px-4 py-1.5 text-sm font-bold uppercase tracking-wider">Go</button>

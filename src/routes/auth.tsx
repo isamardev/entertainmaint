@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Sign in — Entertainme" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Sign in — Entertainment Trends" }, { name: "robots", content: "noindex" }] }),
   component: AuthPage,
 });
 
@@ -33,13 +33,13 @@ function AuthPage() {
 
   return (
     <div className="mx-auto flex max-w-md flex-col px-4 py-16">
-      <Link to="/" className="eyebrow mb-4">← Back to Entertainme</Link>
+      <Link to="/" className="eyebrow mb-4">← Back to Entertainment Trends</Link>
       <div className="border-t-4 border-yellow bg-surface p-6">
         <h1 className="display text-3xl font-black uppercase">
           {mode === "signin" ? "Sign in" : "Create account"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Welcome back to Entertainme." : "Join the conversation."}
+          {mode === "signin" ? "Welcome back to Entertainment Trends." : "Join the conversation."}
         </p>
         <form onSubmit={submit} className="mt-6 space-y-3">
           {mode === "signup" && (

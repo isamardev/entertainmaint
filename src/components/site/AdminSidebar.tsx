@@ -39,7 +39,7 @@ export function AdminSidebar() {
     <aside className="w-64 bg-black text-white flex flex-col min-h-screen">
       <div className="p-6 border-b border-gray-700">
         <Link to="/admin" className="display text-2xl font-black text-yellow uppercase">
-          Entertainme Admin
+          Entertainment Trends Admin
         </Link>
       </div>
       <nav className="flex-1 p-4 space-y-2">

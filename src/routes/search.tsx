@@ -12,7 +12,7 @@ export const Route = createFileRoute("/search")({
   validateSearch: (s) => searchSchema.parse(s),
   head: () => ({
     meta: [
-      { title: "Search — Entertainme" },
+      { title: "Search — Entertainment Trends" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -39,7 +39,7 @@ function SearchPage() {
       </div>
       <form onSubmit={(e) => { e.preventDefault(); navigate({ search: { q } }); }}
             className="mb-8 flex gap-2 border-b-2 border-yellow pb-3">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Entertainme…"
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Entertainment Trends…"
                className="flex-1 bg-transparent text-xl outline-none placeholder:text-muted-foreground" />
         <button className="yellow-bar px-4 py-2 text-sm font-black uppercase tracking-widest">Search</button>
       </form>

@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 
 // Client-only admin gate. RLS is still the source of truth on the server.
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin — Entertainme" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Admin — Entertainment Trends" }, { name: "robots", content: "noindex" }] }),
   component: AdminLayout,
 });
 
@@ -24,7 +24,7 @@ function AdminLayout() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-8 border-b-4 border-yellow pb-4">
-        <div className="eyebrow">Entertainme</div>
+        <div className="eyebrow">Entertainment Trends</div>
         <h1 className="display text-3xl font-black uppercase">Admin Dashboard</h1>
       </div>
       <Outlet />

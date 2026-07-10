@@ -15,12 +15,12 @@ export const Route = createFileRoute("/article/$slug")({
     return { article };
   },
   head: ({ loaderData, params }) => {
-    if (!loaderData) return { meta: [{ title: "Article — Entertainme" }, { name: "robots", content: "noindex" }] };
+    if (!loaderData) return { meta: [{ title: "Article — Entertainment Trends" }, { name: "robots", content: "noindex" }] };
     const a = loaderData.article;
     const img = a.hero_image_hd ?? a.hero_image_lq ?? undefined;
     return {
       meta: [
-        { title: `${a.title} — Entertainme` },
+        { title: `${a.title} — Entertainment Trends` },
         { name: "description", content: a.dek ?? a.title },
         { property: "og:title", content: a.title },
         { property: "og:description", content: a.dek ?? "" },
@@ -84,7 +84,7 @@ function ArticlePage() {
             </h1>
             {article.dek && <p className="mt-4 text-lg text-muted-foreground md:text-xl">{article.dek}</p>}
             <div className="meta mt-4 flex flex-wrap gap-x-4 gap-y-1">
-              <span>By Entertainme Staff</span>
+              <span>By Entertainment Trends Staff</span>
               <span>{fullDate(article.published_at)}</span>
             </div>
           </header>

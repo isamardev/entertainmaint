@@ -30,6 +30,12 @@ export type Article = {
   category?: Category | null;
 };
 
+const REMOVED_SLUGS = new Set(["summer-movie-preview"]);
+
+function withoutRemoved<T extends { slug: string }>(articles: T[]): T[] {
+  return articles.filter((a) => !REMOVED_SLUGS.has(a.slug));
+}
+
 // Dummy data
 const DUMMY_CATEGORIES: Category[] = [
   { id: "cat-1", name: "Celebrity", slug: "celebrity", description: null, sort_order: 1 },
@@ -221,28 +227,6 @@ This is one interview you won't want to miss – stay tuned for the full story c
     updated_at: new Date(Date.now() - 80 * 60 * 60 * 1000).toISOString(),
     category: DUMMY_CATEGORIES[0],
   },
-  {
-    id: "art-8",
-    slug: "summer-movie-preview",
-    title: "Summer Movie Preview: The Films You Can't Miss",
-    dek: "From action blockbusters to heartfelt dramas, here are the movies you need to see this summer.",
-    body: `Summer is just around the corner, and that means it's time for the biggest movie season of the year! From explosive action films to touching dramas and hilarious comedies, there's something for everyone at the cinema this summer.
-
-We've rounded up all the must-see films coming out in the next few months, so you can plan your moviegoing schedule now. Get ready for an unforgettable summer at the movies!`,
-    hero_image_hd: "https://picsum.photos/seed/summer-movies/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/summer-movies/600/400",
-    hero_caption: null,
-    category_id: "cat-2",
-    author_id: null,
-    status: "published",
-    is_breaking: false,
-    is_featured: false,
-    view_count: 7200,
-    published_at: new Date(Date.now() - 90 * 60 * 60 * 1000).toISOString(),
-    created_at: new Date(Date.now() - 90 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 90 * 60 * 60 * 1000).toISOString(),
-    category: DUMMY_CATEGORIES[1],
-  },
 ];
 
 const SELECT = "*, category:categories(id,name,slug,description,sort_order)";
@@ -262,10 +246,10 @@ export const articleService = {
       q = q.range(from, to);
       const { data, error, count } = await q;
       if (error || !data || data.length === 0) throw new Error("No data");
-      return { data: (data ?? []) as unknown as Article[], count: count ?? 0 };
+      return { data: withoutRemoved((data ?? []) as unknown as Article[]), count: count ?? 0 };
     } catch (e) {
       // Fallback to dummy data
-      let filtered = [...DUMMY_ARTICLES];
+      let filtered = withoutRemoved([...DUMMY_ARTICLES]);
       if (opts.categorySlug) {
         filtered = filtered.filter(a => a.category?.slug === opts.categorySlug);
       }
@@ -279,6 +263,7 @@ export const articleService = {
   },
 
   async getBySlug(slug: string) {
+    if (REMOVED_SLUGS.has(slug)) return null;
     try {
       const { data, error } = await supabase.from("articles").select(SELECT).eq("slug", slug).maybeSingle();
       if (error || !data) throw new Error("Not found");
@@ -294,9 +279,9 @@ export const articleService = {
         .eq("status", "published").eq("is_breaking", true)
         .order("published_at", { ascending: false }).limit(6);
       if (!data || data.length === 0) throw new Error("No data");
-      return data ?? [];
+      return withoutRemoved(data ?? []);
     } catch (e) {
-      return DUMMY_ARTICLES.filter(a => a.is_breaking).slice(0, 6);
+      return withoutRemoved(DUMMY_ARTICLES.filter(a => a.is_breaking)).slice(0, 6);
     }
   },
 
@@ -308,9 +293,9 @@ export const articleService = {
         .order("published_at", { ascending: false })
         .limit(limit);
       if (!data || data.length === 0) throw new Error("No data");
-      return data ?? [];
+      return withoutRemoved(data ?? []);
     } catch (e) {
-      return [...DUMMY_ARTICLES].sort((a, b) => b.view_count - a.view_count).slice(0, limit);
+      return withoutRemoved([...DUMMY_ARTICLES].sort((a, b) => b.view_count - a.view_count)).slice(0, limit);
     }
   },
 
@@ -324,14 +309,14 @@ export const articleService = {
         .order("published_at", { ascending: false })
         .limit(30);
       if (error || !data || data.length === 0) throw new Error("No data");
-      return (data ?? []) as unknown as Article[];
+      return withoutRemoved((data ?? []) as unknown as Article[]);
     } catch (e) {
       const term = q.trim().toLowerCase();
       if (!term) return [];
-      return DUMMY_ARTICLES.filter(a => 
+      return withoutRemoved(DUMMY_ARTICLES.filter(a => 
         a.title.toLowerCase().includes(term) || 
         (a.dek?.toLowerCase().includes(term))
-      );
+      ));
     }
   },
 
@@ -345,11 +330,11 @@ export const articleService = {
         .order("published_at", { ascending: false })
         .limit(limit);
       if (!data || data.length === 0) throw new Error("No data");
-      return data ?? [];
+      return withoutRemoved(data ?? []);
     } catch (e) {
-      return DUMMY_ARTICLES.filter(a => 
+      return withoutRemoved(DUMMY_ARTICLES.filter(a => 
         a.category?.id === article.category_id && a.id !== article.id
-      ).slice(0, limit);
+      )).slice(0, limit);
     }
   },
 

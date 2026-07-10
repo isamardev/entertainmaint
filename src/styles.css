@@ -125,6 +125,19 @@
   color: var(--muted-foreground);
 }
 
+@utility trending-track {
+  animation: trending-scroll 50s linear infinite;
+}
+
+.trending-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes trending-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 @utility ticker-track {
   animation: ticker 40s linear infinite;
 }

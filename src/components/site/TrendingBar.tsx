@@ -9,48 +9,44 @@ export function TrendingBar() {
     staleTime: 60_000,
   });
 
+  const items = data.length
+    ? data
+    : [{ id: "fallback", slug: "", title: "Welcome to Entertainment Trends — your daily dose of pop culture." }];
+  const doubled = [...items, ...items];
+
   return (
-    <div className="bg-white py-3 border-b border-yellow">
-      <div className="mx-auto max-w-7xl px-4">
-        <div className="flex items-center gap-4">
-          <span className="display shrink-0 text-yellow text-sm font-black uppercase tracking-widest">
-            Trending Now
-          </span>
-          <div className="flex gap-6 overflow-x-auto pb-1 no-scrollbar flex-1">
-            {data.map((a: any) => (
-              <Link
-                key={a.id}
-                to="/article/$slug"
-                params={{ slug: a.slug }}
-                className="flex items-center gap-3 min-w-[350px] group"
-              >
-                {(() => {
-                  const img = a.hero_image_hd ?? a.hero_image_lq;
-                  return img ? (
+    <div className="overflow-hidden border-b border-yellow bg-white py-3">
+      <div className="flex items-center">
+        <span className="display relative z-10 shrink-0 bg-white px-4 text-sm font-black uppercase tracking-widest text-yellow">
+          Trending Now
+        </span>
+        <div className="relative min-w-0 flex-1 overflow-hidden">
+          <div className="trending-track flex min-w-max items-center gap-8 pl-2">
+            {doubled.map((a: any, i) => {
+              const img = a.hero_image_hd ?? a.hero_image_lq;
+              return (
+                <Link
+                  key={`${a.id}-${i}`}
+                  to="/article/$slug"
+                  params={{ slug: a.slug || "#" }}
+                  className="group flex min-w-[320px] max-w-[360px] items-center gap-3"
+                >
+                  {img && (
                     <img
                       src={img}
                       alt={a.title}
-                      className="h-16 w-24 object-cover flex-shrink-0"
+                      className="h-14 w-20 shrink-0 object-cover"
                     />
-                  ) : null;
-                })()}
-                <span className="text-black text-sm font-bold leading-tight group-hover:text-yellow line-clamp-2">
-                  {a.title}
-                </span>
-              </Link>
-            ))}
+                  )}
+                  <span className="line-clamp-2 text-sm font-bold leading-tight text-black group-hover:text-yellow">
+                    {a.title}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   );
 }

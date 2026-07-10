@@ -6,7 +6,10 @@ export function Footer() {
     <footer className="mt-16 border-t border-border bg-surface">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 md:grid-cols-4">
         <div>
-          <div className="display text-2xl font-black uppercase">Entertain<span className="text-yellow">me</span></div>
+          <img src="/logo.png" alt="Entertainment Trends" className="mb-3 h-12 w-12 object-contain" />
+          <div className="display text-2xl font-black uppercase">
+            Entertainment <span className="text-yellow">Trends</span>
+          </div>
           <p className="mt-2 text-sm text-muted-foreground">The pulse of pop culture — celebrity, TV, music, style, royals, and sport.</p>
         </div>
         <div>
@@ -35,7 +38,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Entertainme. All rights reserved.
+        © {new Date().getFullYear()} Entertainment Trends. All rights reserved.
       </div>
     </footer>
   );

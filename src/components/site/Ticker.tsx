@@ -8,7 +8,7 @@ export function Ticker() {
     queryFn: () => articleService.listBreaking(),
     staleTime: 60_000,
   });
-  const items = data.length ? data : [{ id: "x", slug: "", title: "Welcome to Entertainme — the pulse of pop culture, refreshed nonstop." }];
+  const items = data.length ? data : [{ id: "x", slug: "", title: "Welcome to Entertainment Trends — the pulse of pop culture, refreshed nonstop." }];
   const doubled = [...items, ...items];
   return (
     <div className="yellow-bar overflow-hidden border-y border-black/20 relative">
