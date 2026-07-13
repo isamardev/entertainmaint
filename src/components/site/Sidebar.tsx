@@ -15,7 +15,7 @@ export function TrendingSidebar() {
   });
   const popularData = popularResponse.data || [];
   return (
-    <aside className="sticky top-24 space-y-6">
+    <aside className="space-y-6">
       {/* Trending Now */}
       <div className="border-t-4 border-yellow bg-white p-5">
         <h3 className="display mb-4 text-xl font-black uppercase tracking-wide">Trending Now</h3>

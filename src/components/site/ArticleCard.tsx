@@ -2,11 +2,11 @@ import { Link } from "@tanstack/react-router";
 import type { Article } from "@/services/articleService";
 import { timeAgo } from "@/lib/format";
 
-type Props = { article: Article; size?: "sm" | "md" | "lg"; horizontal?: boolean };
+type Props = { article: Article; size?: "sm" | "md" | "lg"; horizontal?: boolean; imageOverride?: string };
 
-export function ArticleCard({ article, size = "md", horizontal = false }: Props) {
-  const hd = article.hero_image_hd ?? article.hero_image_lq ?? "";
-  const lq = article.hero_image_lq ?? hd;
+export function ArticleCard({ article, size = "md", horizontal = false, imageOverride }: Props) {
+  const hd = imageOverride ?? article.hero_image_hd ?? article.hero_image_lq ?? "";
+  const lq = imageOverride ?? article.hero_image_lq ?? hd;
   const cat = article.category?.name;
   return (
     <article className={`group ${horizontal ? "flex gap-4" : ""}`}>
