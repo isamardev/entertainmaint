@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { articleService, categoryService, type Article } from "@/services/articleService";
-import { supabase } from "@/integrations/supabase/client";
 
 type Props = {
   initial?: Partial<Article>;
@@ -27,35 +26,52 @@ export function ArticleForm({ initial, onSaved }: Props) {
 
   function set<K extends keyof Article>(k: K, v: Article[K]) { setForm((f) => ({ ...f, [k]: v })); }
 
+  // Convert category_id to number if it's a string
+  const categoryId = typeof form.category_id === "string" ? Number(form.category_id) : form.category_id;
+
   async function upload(file: File) {
-    setUploading(true); setErr(null);
+    setUploading(true);
+    setErr(null);
     try {
-      const ext = file.name.split(".").pop() ?? "jpg";
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error } = await supabase.storage.from("article-images").upload(path, file, { upsert: false, contentType: file.type });
-      if (error) throw error;
-      const { data: signed } = await supabase.storage.from("article-images").createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
-      // Storage bucket is private with a public-read RLS policy on storage.objects.
-      // Build a public-style URL via signed URL fallback (works even if bucket is private).
-      const url = signed?.signedUrl ?? "";
-      set("hero_image_hd", url);
-      set("hero_image_lq", url);
-    } catch (e: any) { setErr(e.message); } finally { setUploading(false); }
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await fetch("http://localhost:3001/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      const data = await response.json();
+      set("hero_image_hd", data.imageUrl);
+      set("hero_image_lq", data.imageUrl);
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function submit(e: React.FormEvent) {
-    e.preventDefault(); setErr(null); setSaving(true);
+    e.preventDefault(); 
+    setErr(null); 
+    setSaving(true);
     try {
       const payload: Partial<Article> = {
         ...form,
+        category_id: categoryId,
         slug: (form.slug && form.slug.length > 0 ? form.slug : slugify(form.title ?? "")) as string,
         published_at: form.status === "published" ? (form.published_at ?? new Date().toISOString()) : null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       const saved = initial?.id
         ? await articleService.update(initial.id, payload)
         : await articleService.create(payload);
       onSaved(saved);
-    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+    } catch (e: any) { 
+      setErr(e.message); 
+    } finally { 
+      setSaving(false); 
+    }
   }
 
   return (
@@ -107,7 +123,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
         </div>
         <div className="border border-border bg-surface p-4">
           <div className="eyebrow mb-3">Category</div>
-          <select value={form.category_id ?? ""} onChange={(e) => set("category_id", e.target.value || null)}
+          <select value={categoryId ?? ""} onChange={(e) => set("category_id", e.target.value ? Number(e.target.value) : null)}
                   className="w-full border border-border bg-background px-2 py-1.5">
             <option value="">— None —</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -116,11 +132,19 @@ export function ArticleForm({ initial, onSaved }: Props) {
         <div className="border border-border bg-surface p-4">
           <div className="eyebrow mb-3">Hero Image</div>
           {form.hero_image_hd && <img src={form.hero_image_hd} alt="" className="mb-2 w-full" />}
-          <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+          <input 
+            type="file" 
+            accept="image/*" 
+            onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} 
+            className="w-full"
+          />
           {uploading && <div className="meta mt-2">Uploading…</div>}
-          <input placeholder="…or paste image URL" value={form.hero_image_hd ?? ""}
-                 onChange={(e) => { set("hero_image_hd", e.target.value); set("hero_image_lq", e.target.value); }}
-                 className="mt-2 w-full border border-border bg-background px-2 py-1.5 text-xs" />
+          <input 
+            placeholder="…or paste image URL" 
+            value={form.hero_image_hd ?? ""}
+            onChange={(e) => { set("hero_image_hd", e.target.value); set("hero_image_lq", e.target.value); }}
+            className="mt-2 w-full border border-border bg-background px-2 py-1.5 text-xs" 
+          />
         </div>
 
         {err && <div className="border border-destructive bg-destructive/10 p-3 text-xs">{err}</div>}

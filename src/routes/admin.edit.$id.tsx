@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { articleService } from "@/services/articleService";
 import { ArticleForm } from "@/components/admin/ArticleForm";
 
 export const Route = createFileRoute("/admin/edit/$id")({ component: EditArticle });
@@ -8,12 +8,13 @@ export const Route = createFileRoute("/admin/edit/$id")({ component: EditArticle
 function EditArticle() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
+  const numericId = Number(id);
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-article", id],
+    queryKey: ["admin-article", numericId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("articles").select("*").eq("id", id).single();
-      if (error) throw error;
-      return data;
+      const res = await fetch(`http://localhost:3001/api/articles/${numericId}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return await res.json();
     },
   });
 

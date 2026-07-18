@@ -24,7 +24,7 @@ function CategoriesAdmin() {
       qc.invalidateQueries({ queryKey: ["categories"] });
     } catch (e: any) { setErr(e.message); }
   }
-  async function del(id: string) {
+  async function del(id: number) {
     if (!confirm("Delete category?")) return;
     await categoryService.remove(id);
     qc.invalidateQueries({ queryKey: ["categories"] });

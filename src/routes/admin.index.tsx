@@ -9,7 +9,7 @@ function AdminArticles() {
   const qc = useQueryClient();
   const { data = [], isLoading } = useQuery({ queryKey: ["admin-articles"], queryFn: articleService.listAll });
 
-  async function del(id: string) {
+  async function del(id: number) {
     if (!confirm("Delete this article?")) return;
     await articleService.remove(id);
     qc.invalidateQueries({ queryKey: ["admin-articles"] });
