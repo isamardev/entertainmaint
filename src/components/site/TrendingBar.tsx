@@ -11,13 +11,20 @@ export function TrendingBar() {
 
   const items = data.length
     ? data
-    : [{ id: "fallback", slug: "", title: "Welcome to Entertainment Trends — your daily dose of pop culture." }];
+    : [
+        {
+          id: "fallback",
+          slug: "",
+          title: "Loading trending stories...",
+        },
+      ];
+
   const doubled = [...items, ...items];
 
   return (
-    <div className="overflow-hidden border-b border-yellow bg-white py-3">
+    <div className="overflow-hidden border-b border-black bg-white py-3">
       <div className="flex items-center">
-        <span className="display relative z-10 shrink-0 bg-white px-4 text-sm font-black uppercase tracking-widest text-yellow">
+        <span className="display relative z-10 shrink-0 bg-white px-4 text-sm font-black uppercase tracking-widest text-black">
           Trending Now
         </span>
         <div className="relative min-w-0 flex-1 overflow-hidden">
@@ -32,13 +39,11 @@ export function TrendingBar() {
                   className="group flex min-w-[320px] max-w-[360px] items-center gap-3"
                 >
                   {img && (
-                    <img
-                      src={img}
-                      alt={a.title}
-                      className="h-14 w-20 shrink-0 object-cover"
-                    />
+                    <div className="h-14 w-18 shrink-0 overflow-hidden bg-gray-100">
+                      <img src={img} alt={a.title} className="h-full w-full object-cover" />
+                    </div>
                   )}
-                  <span className="line-clamp-2 text-sm font-bold leading-tight text-black group-hover:text-yellow">
+                  <span className="line-clamp-2 text-sm font-bold leading-tight text-black group-hover:text-black">
                     {a.title}
                   </span>
                 </Link>

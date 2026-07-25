@@ -59,8 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value: AuthState = {
-    user: isDevAdmin ? { id: "dev-admin-id", email: "admin@gmail.com" } as any : session?.user ?? null,
-    session: isDevAdmin ? {} as any : session,
+    user: isDevAdmin
+      ? ({ id: "dev-admin-id", email: "admin@gmail.com" } as any)
+      : (session?.user ?? null),
+    session: isDevAdmin ? ({} as any) : session,
     roles,
     loading,
     isAdmin: isDevAdmin || roles.includes("admin") || roles.includes("super_admin"),
@@ -79,7 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async signUp(email, password, displayName) {
       const { error } = await supabase.auth.signUp({
-        email, password,
+        email,
+        password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: displayName ? { display_name: displayName } : undefined,
@@ -87,14 +90,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return { error: error?.message };
     },
-    async signOut() { 
+    async signOut() {
       if (isDevAdmin) {
         localStorage.removeItem("dev_admin");
         setIsDevAdmin(false);
         setRoles([]);
         return;
       }
-      await supabase.auth.signOut(); 
+      await supabase.auth.signOut();
     },
   };
 

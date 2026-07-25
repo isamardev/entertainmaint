@@ -11,10 +11,7 @@ const searchSchema = z.object({ q: z.string().optional().default("") });
 export const Route = createFileRoute("/search")({
   validateSearch: (s) => searchSchema.parse(s),
   head: () => ({
-    meta: [
-      { title: "Search — Entertainment Trends" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Search — Entertainment Trends" }, { name: "robots", content: "noindex" }],
   }),
   component: SearchPage,
 });
@@ -37,11 +34,22 @@ function SearchPage() {
         <div className="eyebrow">Search</div>
         <h1 className="display text-4xl font-black uppercase md:text-5xl">Find a story</h1>
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); navigate({ search: { q } }); }}
-            className="mb-8 flex gap-2 border-b-2 border-yellow pb-3">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Entertainment Trends…"
-               className="flex-1 bg-transparent text-xl outline-none placeholder:text-muted-foreground" />
-        <button className="yellow-bar px-4 py-2 text-sm font-black uppercase tracking-widest">Search</button>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          navigate({ search: { q } });
+        }}
+        className="mb-8 flex gap-2 border-b-2 border-yellow pb-3"
+      >
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search Entertainment Trends…"
+          className="flex-1 bg-transparent text-xl outline-none placeholder:text-muted-foreground"
+        />
+        <button className="yellow-bar px-4 py-2 text-sm font-black uppercase tracking-widest">
+          Search
+        </button>
       </form>
 
       {!term && <p className="text-muted-foreground">Enter a search term to see stories.</p>}
@@ -53,9 +61,13 @@ function SearchPage() {
       )}
       {term && !isLoading && data.length > 0 && (
         <>
-          <div className="meta mb-4">{data.length} result{data.length === 1 ? "" : "s"} for “{term}”</div>
+          <div className="meta mb-4">
+            {data.length} result{data.length === 1 ? "" : "s"} for “{term}”
+          </div>
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {data.map((a) => <ArticleCard key={a.id} article={a} />)}
+            {data.map((a) => (
+              <ArticleCard key={a.id} article={a} />
+            ))}
           </div>
         </>
       )}

@@ -9,5 +9,11 @@ export function CardSkeleton() {
   );
 }
 export function GridSkeleton({ n = 6 }: { n?: number }) {
-  return <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: n }).map((_, i) => <CardSkeleton key={i} />)}</div>;
+  return (
+    <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: n }).map((_, i) => (
+        <CardSkeleton key={i} />
+      ))}
+    </div>
+  );
 }

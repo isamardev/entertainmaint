@@ -2,58 +2,145 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { articleService } from "@/services/articleService";
 import { fullDate } from "@/lib/format";
+import { Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useState } from "react";
+import { z } from "zod";
+import { DeleteModal } from "@/components/site/DeleteModal";
 
-export const Route = createFileRoute("/admin/")({ component: AdminArticles });
+const adminArticlesSearchSchema = z.object({
+  status: z.enum(["all", "draft", "published", "archived"]).optional().default("all"),
+});
+
+export const Route = createFileRoute("/admin/")({
+  validateSearch: (s) => adminArticlesSearchSchema.parse(s),
+  component: AdminArticles,
+});
+
+type StatusFilter = "all" | "draft" | "published" | "archived";
 
 function AdminArticles() {
   const qc = useQueryClient();
-  const { data = [], isLoading } = useQuery({ queryKey: ["admin-articles"], queryFn: articleService.listAll });
+  const { status: statusFilter } = Route.useSearch();
+  const { data = [], isLoading, error } = useQuery({
+    queryKey: ["admin-articles"],
+    queryFn: articleService.listAll,
+  });
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: number;
+    title: string;
+  }>({ isOpen: false, id: 0, title: "" });
 
-  async function del(id: number) {
-    if (!confirm("Delete this article?")) return;
-    await articleService.remove(id);
-    qc.invalidateQueries({ queryKey: ["admin-articles"] });
+  async function handleDelete() {
+    try {
+      await articleService.remove(deleteModal.id);
+      qc.invalidateQueries({ queryKey: ["admin-articles"] });
+      toast.success("Article deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting article:", error);
+      toast.error(`Failed to delete article: ${(error as any).message || "Unknown error"}`);
+    } finally {
+      setDeleteModal({ isOpen: false, id: 0, title: "" });
+    }
   }
 
+  const filteredArticles =
+    statusFilter === "all" ? data : data.filter((a) => a.status === statusFilter);
+
+  const titleByStatus: Record<StatusFilter, string> = {
+    all: "All Articles",
+    published: "Published Articles",
+    draft: "Draft Articles",
+    archived: "Archived Articles",
+  };
+
   return (
-    <div>
-      <div className="mb-4">
-        <h2 className="display text-xl font-black uppercase">All Articles</h2>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-4 shrink-0">
+        <h2 className="display text-xl font-black uppercase">{titleByStatus[statusFilter]}</h2>
       </div>
-      {isLoading ? <div className="meta">Loading…</div> : (
-        <div className="overflow-x-auto border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface text-left">
-              <tr>
-                <th className="p-3 meta">Title</th>
-                <th className="p-3 meta">Category</th>
-                <th className="p-3 meta">Status</th>
-                <th className="p-3 meta">Updated</th>
-                <th className="p-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((a) => (
-                <tr key={a.id} className="border-t border-border">
-                  <td className="p-3 font-semibold">{a.title}</td>
-                  <td className="p-3 text-muted-foreground">{a.category?.name ?? "—"}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 text-[0.65rem] font-black uppercase tracking-widest ${
-                      a.status === "published" ? "yellow-bar" : "border border-border text-muted-foreground"
-                    }`}>{a.status}</span>
-                  </td>
-                  <td className="p-3 text-xs text-muted-foreground">{fullDate(a.updated_at)}</td>
-                  <td className="p-3 text-right">
-                    <Link to="/admin/edit/$id" params={{ id: a.id }} className="mr-2 text-xs font-bold uppercase text-yellow hover:underline">Edit</Link>
-                    <button onClick={() => del(a.id)} className="text-xs font-bold uppercase text-destructive hover:underline">Delete</button>
-                  </td>
+      {isLoading ? (
+        <div className="text-sm text-black">Loading…</div>
+      ) : error ? (
+        <div className="border border-red-500 bg-red-50 p-4 text-red-800">
+          <p className="font-semibold">Error loading articles</p>
+          <p className="text-sm mt-1">{(error as any).message || "Unknown error"}</p>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto border border-gray-200">
+          <div className="min-w-[840px]">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-left">
+                <tr>
+                  <th className="p-3 text-xs font-black uppercase tracking-widest text-black">
+                    Title
+                  </th>
+                  <th className="p-3 text-xs font-black uppercase tracking-widest text-black">
+                    Category
+                  </th>
+                  <th className="p-3 text-xs font-black uppercase tracking-widest text-black">
+                    Status
+                  </th>
+                  <th className="p-3 text-xs font-black uppercase tracking-widest text-black">
+                    Updated
+                  </th>
+                  <th className="p-3"></th>
                 </tr>
-              ))}
-              {data.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No articles yet.</td></tr>}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredArticles.map((a) => (
+                  <tr key={a.id} className="border-t border-gray-200">
+                    <td className="p-3 font-semibold">{a.title}</td>
+                    <td className="p-3 text-black">{a.category?.name ?? "—"}</td>
+                    <td className="p-3">
+                      <span
+                        className={`px-2 py-0.5 text-[0.65rem] font-black uppercase tracking-widest ${
+                          a.status === "published"
+                            ? "bg-black text-white"
+                            : "border border-gray-300 text-black"
+                        }`}
+                      >
+                        {a.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-xs text-black">{fullDate(a.updated_at)}</td>
+                    <td className="p-3 text-right flex items-center justify-end gap-2">
+                      <Link
+                        to="/admin/edit/$id"
+                        params={{ id: a.id }}
+                        className="p-1 text-black hover:text-gray-700"
+                      >
+                        <Pencil size={18} />
+                      </Link>
+                      <button
+                        onClick={() => setDeleteModal({ isOpen: true, id: a.id, title: a.title })}
+                        className="p-1 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredArticles.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-black">
+                      No {statusFilter} articles yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+      <DeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Delete Article"
+        message={`Are you sure you want to delete "${deleteModal.title}"?`}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteModal({ isOpen: false, id: 0, title: "" })}
+      />
     </div>
   );
 }

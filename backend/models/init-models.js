@@ -1,10 +1,7 @@
 var DataTypes = require("sequelize").DataTypes;
 
 function initModels(sequelize) {
-
-
-  return {
-  };
+  return {};
 }
 module.exports = initModels;
 module.exports.initModels = initModels;

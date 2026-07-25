@@ -2,10 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { articleService, type Article } from "@/services/articleService";
-import { ArticleCard } from "@/components/site/ArticleCard";
+import { ArticleCard, ArticleMedia } from "@/components/site/ArticleCard";
 import { TrendingSidebar } from "@/components/site/Sidebar";
 import { GridSkeleton } from "@/components/site/Skeleton";
-import { timeAgo } from "@/lib/format";
 
 function articleImage(article: Article, alt = false) {
   const primary = article.hero_image_hd ?? article.hero_image_lq ?? "";
@@ -35,11 +34,49 @@ function Home() {
     queryFn: () => articleService.listPublished({ limit: 25 }),
   });
   const articles = data?.data ?? [];
-  const [featured1, leftTopArticle, rightLargeArticle, leftBottomArticle, ...rest] = articles;
+  const mobileSections: Array<{ featured?: Article; list: Article[] }> = [];
 
-  const grid1 = rest.slice(0, 3);
-  const grid2 = rest.slice(3, 6);
-  const remaining = rest.slice(6);
+  let mobileIndex = 0;
+  while (mobileIndex < articles.length) {
+    const featured = articles[mobileIndex++];
+    const list = articles.slice(mobileIndex, mobileIndex + 3);
+    mobileIndex += list.length;
+    mobileSections.push({ featured, list });
+  }
+
+  // Split articles into chunks for repeating pattern
+  const chunks: Array<{
+    large: Article | undefined;
+    grid: Article[];
+    split: { large: Article | undefined; top: Article | undefined; bottom: Article | undefined } | undefined;
+  }> = [];
+  
+  let i = 0;
+  while (i < articles.length) {
+    const chunk: any = {};
+    
+    // First: Large article
+    chunk.large = articles[i++];
+    
+    // Next: 3 for grid
+    chunk.grid = [];
+    for (let j = 0; j < 3 && i < articles.length; j++) {
+      chunk.grid.push(articles[i++]);
+    }
+    
+    // Next: 3 for split layout
+    if (i + 2 < articles.length) {
+      chunk.split = {
+        large: articles[i++],
+        top: articles[i++],
+        bottom: articles[i++]
+      };
+    } else {
+      chunk.split = undefined;
+    }
+    
+    chunks.push(chunk);
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -47,35 +84,110 @@ function Home() {
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
-          <HomeArticleSections
-            isLoading={isLoading}
-            featured1={featured1}
-            grid1={grid1}
-            grid2={grid2}
-            leftTopArticle={leftTopArticle}
-            rightLargeArticle={rightLargeArticle}
-            leftBottomArticle={leftBottomArticle}
-            largeOnLeft={false}
-          />
+          <div className="md:hidden">
+            {isLoading ? (
+              <div className="animate-pulse space-y-8">
+                <div className="aspect-[16/9] bg-surface w-full" />
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="flex gap-4">
+                      <div className="aspect-[16/10] w-32 shrink-0 bg-surface" />
+                      <div className="flex-1 space-y-2 pt-1">
+                        <div className="h-5 w-full bg-surface" />
+                        <div className="h-5 w-4/5 bg-surface" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="aspect-[16/9] bg-surface w-full" />
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {mobileSections.map((section, sectionIndex) => (
+                  <div key={section.featured?.id ?? sectionIndex} className="space-y-5">
+                    {section.featured && (
+                      <FeaturedArticle
+                        article={section.featured}
+                        isLoading={isLoading}
+                        keySuffix={`mobile-${sectionIndex}`}
+                        useAltImage={sectionIndex % 2 !== 0}
+                      />
+                    )}
 
-          <MoreStories articles={remaining} />
+                    {section.list.length > 0 && (
+                      <div className="space-y-4">
+                        {section.list.map((article, articleIndex) => (
+                          <ArticleCard
+                            key={`${article.id}-mobile-${articleIndex}`}
+                            article={article}
+                            horizontal
+                            size="sm"
+                            imageOverride={sectionIndex % 2 !== 0 ? articleImage(article, true) : undefined}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          <div className="mt-10 border-t-4 border-yellow pt-10">
-            <div className="mb-8 border-b-2 border-yellow pb-2">
-              <h2 className="display text-2xl font-black uppercase">Latest Stories</h2>
-            </div>
-            <HomeArticleSections
-              isLoading={isLoading}
-              featured1={featured1}
-              grid1={grid1}
-              grid2={grid2}
-              leftTopArticle={leftTopArticle}
-              rightLargeArticle={rightLargeArticle}
-              leftBottomArticle={leftBottomArticle}
-              largeOnLeft
-              useAltImage
-              keySuffix="-copy"
-            />
+          <div className="hidden md:block">
+            {isLoading ? (
+              <div className="animate-pulse space-y-10">
+                <div className="aspect-[16/9] bg-surface w-full" />
+                <GridSkeleton />
+                <GridSkeleton />
+                <div className="grid gap-6 md:grid-cols-[2fr_3fr]">
+                  <div className="space-y-6">
+                    <div className="aspect-[16/10] bg-surface" />
+                    <div className="aspect-[16/10] bg-surface" />
+                  </div>
+                  <div className="aspect-[16/9] bg-surface" />
+                </div>
+              </div>
+            ) : (
+              <>
+                {chunks.map((chunk, chunkIndex) => (
+                  <div key={chunkIndex}>
+                    {chunk.large && (
+                      <FeaturedArticle
+                        article={chunk.large}
+                        isLoading={isLoading}
+                        keySuffix={`chunk-${chunkIndex}`}
+                        useAltImage={chunkIndex % 2 !== 0}
+                      />
+                    )}
+
+                    {chunk.grid.length > 0 && (
+                      <ArticleGrid
+                        articles={chunk.grid}
+                        isLoading={isLoading}
+                        keySuffix={`chunk-${chunkIndex}`}
+                        useAltImage={chunkIndex % 2 !== 0}
+                      />
+                    )}
+
+                    {chunk.split && (
+                      <SplitArticleLayout
+                        largeArticle={chunk.split.large!}
+                        topArticle={chunk.split.top!}
+                        bottomArticle={chunk.split.bottom!}
+                        largeOnLeft={chunkIndex % 2 === 0}
+                        useAltImage={chunkIndex % 2 !== 0}
+                      />
+                    )}
+                  </div>
+                ))}
+
+                {chunks.flatMap(c => [c.large, ...c.grid, c.split?.large, c.split?.top, c.split?.bottom]).filter(Boolean).length < articles.length && (
+                  <MoreStories
+                    articles={articles.slice(chunks.flatMap(c => [c.large, ...c.grid, c.split?.large, c.split?.top, c.split?.bottom]).filter(Boolean).length)}
+                  />
+                )}
+              </>
+            )}
           </div>
 
           <div className="mt-10 lg:hidden">
@@ -93,82 +205,6 @@ function Home() {
   );
 }
 
-function SectionDivider() {
-  return <div className="my-8 border-t-4 border-yellow" role="separator" />;
-}
-
-function HomeArticleSections({
-  isLoading,
-  featured1,
-  grid1,
-  grid2,
-  leftTopArticle,
-  rightLargeArticle,
-  leftBottomArticle,
-  largeOnLeft,
-  useAltImage = false,
-  keySuffix = "",
-}: {
-  isLoading: boolean;
-  featured1?: Article;
-  grid1: Article[];
-  grid2: Article[];
-  leftTopArticle?: Article;
-  rightLargeArticle?: Article;
-  leftBottomArticle?: Article;
-  largeOnLeft: boolean;
-  useAltImage?: boolean;
-  keySuffix?: string;
-}) {
-  return (
-    <>
-      <FeaturedArticle
-        article={featured1}
-        isLoading={isLoading}
-        keySuffix={keySuffix}
-        useAltImage={useAltImage}
-      />
-
-      {(grid1.length > 0 || isLoading) && (
-        <>
-          <SectionDivider />
-          <ArticleGrid
-            articles={grid1}
-            isLoading={isLoading}
-            keySuffix={keySuffix}
-            useAltImage={useAltImage}
-          />
-        </>
-      )}
-
-      {grid2.length > 0 && (
-        <>
-          <SectionDivider />
-          <ArticleGrid
-            articles={grid2}
-            isLoading={isLoading}
-            keySuffix={keySuffix}
-            useAltImage={useAltImage}
-          />
-        </>
-      )}
-
-      {leftTopArticle && rightLargeArticle && leftBottomArticle && (
-        <>
-          <SectionDivider />
-          <SplitArticleLayout
-            largeArticle={rightLargeArticle}
-            topArticle={leftTopArticle}
-            bottomArticle={leftBottomArticle}
-            largeOnLeft={largeOnLeft}
-            useAltImage={useAltImage}
-          />
-        </>
-      )}
-    </>
-  );
-}
-
 function FeaturedArticle({
   article,
   isLoading,
@@ -181,32 +217,27 @@ function FeaturedArticle({
   useAltImage?: boolean;
 }) {
   if (isLoading && !article) {
-    return <div className="aspect-[16/9] w-full animate-pulse bg-surface" />;
+    return <div className="aspect-[16/9] w-full animate-pulse bg-surface mb-10" />;
   }
   if (!article) return null;
 
   const img = articleImage(article, useAltImage);
 
   return (
-    <section key={`featured${keySuffix}`}>
+    <section key={`featured${keySuffix}`} className="mb-10">
       <Link to={`/article/${article.slug}`} className="group block">
-        <div className="aspect-[16/9] w-full overflow-hidden bg-surface mb-4">
-          {img ? (
-            <img
-              src={img}
-              alt={article.title}
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-          ) : null}
-        </div>
-        {article.category?.name && <div className="eyebrow mb-2">{article.category.name}</div>}
-        <h1 className="display text-3xl font-black leading-[0.95] md:text-5xl lg:text-6xl group-hover:text-yellow">
+        <ArticleMedia
+          article={article}
+          imageOverride={img}
+          className="mb-4 aspect-[16/9] w-full overflow-hidden bg-surface"
+          imgClassName="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+        <h1 className="display text-3xl font-black leading-[0.95] md:text-5xl lg:text-6xl group-hover:text-black">
           {article.title}
         </h1>
         {article.dek && (
           <p className="mt-3 text-base md:text-lg text-muted-foreground hidden md:block">{article.dek}</p>
         )}
-        <div className="meta mt-3">{timeAgo(article.published_at)}</div>
       </Link>
     </section>
   );
@@ -226,7 +257,7 @@ function ArticleGrid({
   if (!articles.length && !isLoading) return null;
 
   return (
-    <div>
+    <div className="mb-10">
       {isLoading ? (
         <GridSkeleton />
       ) : (
@@ -265,26 +296,19 @@ function SplitArticleLayout({
         to={`/article/${article.slug}`}
         className="group flex min-h-0 flex-1 flex-col"
       >
-        <div className="relative mb-3 min-h-[160px] flex-1 overflow-hidden bg-surface sm:min-h-[180px]">
-          {img ? (
-            <img
-              src={img}
-              alt={article.title}
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-          ) : null}
-        </div>
+        <ArticleMedia
+          article={article}
+          imageOverride={img}
+          className="relative mb-3 min-h-[160px] flex-1 overflow-hidden bg-surface sm:min-h-[180px]"
+          imgClassName="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
         <div className="shrink-0 text-left">
-          {article.category?.name && (
-            <div className="eyebrow mb-1">{article.category.name}</div>
-          )}
-          <h3 className="display text-xl font-black leading-tight group-hover:text-yellow">
+          <h3 className="display text-xl font-black leading-tight group-hover:text-black">
             {article.title}
           </h3>
           {article.dek && (
             <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{article.dek}</p>
           )}
-          <div className="meta mt-1.5">{timeAgo(article.published_at)}</div>
         </div>
       </Link>
     );
@@ -293,26 +317,19 @@ function SplitArticleLayout({
   const largeImg = articleImage(largeArticle, useAltImage);
   const largeBlock = (
     <Link to={`/article/${largeArticle.slug}`} className="group flex h-full min-h-0 flex-col">
-      <div className="relative mb-4 min-h-[220px] flex-1 overflow-hidden bg-surface sm:min-h-[280px]">
-        {largeImg ? (
-          <img
-            src={largeImg}
-            alt={largeArticle.title}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-        ) : null}
-      </div>
+      <ArticleMedia
+        article={largeArticle}
+        imageOverride={largeImg}
+        className="relative mb-4 min-h-[220px] flex-1 overflow-hidden bg-surface sm:min-h-[280px]"
+        imgClassName="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+      />
       <div className="shrink-0 text-left">
-        {largeArticle.category?.name && (
-          <div className="eyebrow mb-2">{largeArticle.category.name}</div>
-        )}
-        <h2 className="display text-2xl font-black leading-[0.95] md:text-3xl group-hover:text-yellow">
+        <h2 className="display text-2xl font-black leading-[0.95] md:text-3xl group-hover:text-black">
           {largeArticle.title}
         </h2>
         {largeArticle.dek && (
           <p className="mt-2 line-clamp-3 text-base text-muted-foreground">{largeArticle.dek}</p>
         )}
-        <div className="meta mt-2">{timeAgo(largeArticle.published_at)}</div>
       </div>
     </Link>
   );
@@ -326,7 +343,7 @@ function SplitArticleLayout({
 
   return (
     <div
-      className={`grid gap-6 md:min-h-[560px] md:items-stretch md:gap-5 ${
+      className={`mb-10 grid gap-6 md:min-h-[560px] md:items-stretch md:gap-5 ${
         largeOnLeft ? "md:grid-cols-[3fr_2fr]" : "md:grid-cols-[2fr_3fr]"
       }`}
     >
@@ -349,8 +366,8 @@ function MoreStories({ articles }: { articles: Article[] }) {
   if (!articles.length) return null;
 
   return (
-    <div className="mt-10 border-t-4 border-yellow pt-10">
-      <div className="mb-6 border-b-2 border-yellow pb-2">
+    <div className="mt-10">
+      <div className="mb-6">
         <h2 className="display text-2xl font-black uppercase">More Stories</h2>
       </div>
       <div className="grid gap-6 sm:grid-cols-2">
