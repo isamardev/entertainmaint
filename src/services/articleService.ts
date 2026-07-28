@@ -1,5 +1,5 @@
 // Client-side article/category service using Node.js backend
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:3001/api";
+import { getApiUrl } from "@/lib/api";
 
 export type Category = {
   id: number;
@@ -39,7 +39,7 @@ export const articleService = {
       if (opts.limit) params.set("limit", opts.limit.toString());
       if (opts.offset) params.set("offset", opts.offset.toString());
 
-      const res = await fetch(`${API_BASE}/articles/published?${params}`);
+      const res = await fetch(getApiUrl(`/articles/published?${params}`));
       if (!res.ok) throw new Error("Failed to fetch");
       let data = (await res.json()) as Article[];
 
@@ -59,7 +59,7 @@ export const articleService = {
 
   async getBySlug(slug: string) {
     try {
-      const res = await fetch(`${API_BASE}/articles/slug/${slug}`);
+      const res = await fetch(getApiUrl(`/articles/slug/${slug}`));
       if (!res.ok) return null;
       return (await res.json()) as Article;
     } catch (e) {
@@ -70,7 +70,7 @@ export const articleService = {
 
   async listBreaking() {
     try {
-      const res = await fetch(`${API_BASE}/articles/published`);
+      const res = await fetch(getApiUrl("/articles/published"));
       if (!res.ok) throw new Error("Failed to fetch");
       const data = (await res.json()) as Article[];
       return data.filter((a) => a.is_breaking).slice(0, 6);
@@ -82,7 +82,7 @@ export const articleService = {
 
   async listTrending(limit = 6) {
     try {
-      const res = await fetch(`${API_BASE}/articles/published`);
+      const res = await fetch(getApiUrl("/articles/published"));
       if (!res.ok) throw new Error("Failed to fetch");
       const data = (await res.json()) as Article[];
       return data.sort((a, b) => b.view_count - a.view_count).slice(0, limit);
@@ -96,7 +96,7 @@ export const articleService = {
     try {
       const term = q.trim().toLowerCase();
       if (!term) return [];
-      const res = await fetch(`${API_BASE}/articles/published`);
+      const res = await fetch(getApiUrl("/articles/published"));
       if (!res.ok) throw new Error("Failed to fetch");
       const data = (await res.json()) as Article[];
       return data.filter(
@@ -111,7 +111,7 @@ export const articleService = {
   async related(article: Article, limit = 4) {
     try {
       if (!article.category_id) return [];
-      const res = await fetch(`${API_BASE}/articles/published`);
+      const res = await fetch(getApiUrl("/articles/published"));
       if (!res.ok) throw new Error("Failed to fetch");
       const data = (await res.json()) as Article[];
       return data
@@ -126,7 +126,7 @@ export const articleService = {
   // Admin
   async listAll() {
     try {
-      const res = await fetch(`${API_BASE}/articles?includeCategory=true`);
+      const res = await fetch(getApiUrl("/articles?includeCategory=true"));
       if (!res.ok) throw new Error("Failed to fetch articles");
       return (await res.json()) as Article[];
     } catch (e) {
@@ -153,7 +153,7 @@ export const articleService = {
       embed_url: input.embed_url || null,
     };
     console.log("Creating article with payload:", payload);
-    const res = await fetch(`${API_BASE}/articles`, {
+    const res = await fetch(getApiUrl("/articles"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -173,7 +173,7 @@ export const articleService = {
     delete payload.created_at;
     delete payload.updated_at;
     delete payload.id;
-    const res = await fetch(`${API_BASE}/articles/${id}`, {
+    const res = await fetch(getApiUrl(`/articles/${id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -182,7 +182,7 @@ export const articleService = {
     return await res.json();
   },
   async remove(id: number) {
-    const res = await fetch(`${API_BASE}/articles/${id}`, {
+    const res = await fetch(getApiUrl(`/articles/${id}`), {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to delete article");
@@ -195,7 +195,7 @@ export const articleService = {
 export const categoryService = {
   async list(): Promise<Category[]> {
     try {
-      const res = await fetch(`${API_BASE}/categories`);
+      const res = await fetch(getApiUrl("/categories"));
       if (!res.ok) throw new Error("Failed to fetch");
       return (await res.json()) as Category[];
     } catch (e) {
@@ -205,7 +205,7 @@ export const categoryService = {
   },
   async create(input: Partial<Category>) {
     try {
-      const res = await fetch(`${API_BASE}/categories`, {
+      const res = await fetch(getApiUrl("/categories"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...input, created_at: new Date().toISOString() }),
@@ -221,7 +221,7 @@ export const categoryService = {
   },
   async update(id: number, input: Partial<Category>) {
     try {
-      const res = await fetch(`${API_BASE}/categories/${id}`, {
+      const res = await fetch(getApiUrl(`/categories/${id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...input }),
@@ -237,7 +237,7 @@ export const categoryService = {
   },
   async remove(id: number) {
     try {
-      const res = await fetch(`${API_BASE}/categories/${id}`, {
+      const res = await fetch(getApiUrl(`/categories/${id}`), {
         method: "DELETE",
       });
       if (!res.ok) {

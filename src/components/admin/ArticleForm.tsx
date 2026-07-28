@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { articleService, categoryService, type Article } from "@/services/articleService";
+import { getApiUrl } from "@/lib/api";
 import { toast } from "sonner";
 import {
   AlignCenter,
@@ -13,8 +14,6 @@ import {
   ListOrdered,
   Underline,
 } from "lucide-react";
-
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:3001/api";
 
 type Props = {
   initial?: Partial<Article>;
@@ -72,7 +71,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
     try {
       const formData = new FormData();
       formData.append("image", file);
-      const response = await fetch(`${API_BASE}/upload`, {
+      const response = await fetch(getApiUrl("/upload"), {
         method: "POST",
         body: formData,
       });

@@ -2,8 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { articleService } from "@/services/articleService";
 import { ArticleForm } from "@/components/admin/ArticleForm";
-
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:3001/api";
+import { getApiUrl } from "@/lib/api";
 
 export const Route = createFileRoute("/admin/edit/$id")({ component: EditArticle });
 
@@ -14,7 +13,7 @@ function EditArticle() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-article", numericId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/articles/${numericId}`);
+      const res = await fetch(getApiUrl(`/articles/${numericId}`));
       if (!res.ok) throw new Error("Failed to fetch");
       return await res.json();
     },
