@@ -7,9 +7,16 @@ const testConnection = async () => {
     await db.sequelize.authenticate();
     console.log("✅ Database connection successful!");
 
-    console.log("Checking if 'entertainment' database exists...");
-    // Try to list tables to confirm the database is there
-    const [results] = await db.sequelize.query("SHOW TABLES");
+    const dialect = db.sequelize.getDialect();
+    console.log(`Connected using dialect: ${dialect}`);
+
+    const [results] =
+      dialect === "postgres"
+        ? await db.sequelize.query(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename",
+          )
+        : await db.sequelize.query("SHOW TABLES");
+
     console.log("✅ Database tables found:", results);
 
     process.exit(0);

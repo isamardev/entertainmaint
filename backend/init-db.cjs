@@ -4,6 +4,11 @@ const db = require("./models/index.cjs");
 const Category = require("./models/Category.cjs");
 
 const createDatabase = async () => {
+  if (process.env.DATABASE_URL || process.env.DB_DIALECT === "postgres") {
+    console.log("Skipping CREATE DATABASE because Neon/Postgres database already exists.");
+    return;
+  }
+
   // Create connection without specifying database first
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST || "localhost",
