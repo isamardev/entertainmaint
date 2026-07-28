@@ -9,17 +9,9 @@ export function TrendingBar() {
     staleTime: 60_000,
   });
 
-  const items = data.length
-    ? data
-    : [
-        {
-          id: "fallback",
-          slug: "",
-          title: "Loading trending stories...",
-        },
-      ];
+  if (!data.length) return null;
 
-  const doubled = [...items, ...items];
+  const doubled = [...data, ...data];
 
   return (
     <div className="overflow-hidden border-b border-black bg-white py-3">

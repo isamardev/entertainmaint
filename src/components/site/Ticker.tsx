@@ -8,16 +8,9 @@ export function Ticker() {
     queryFn: () => articleService.listBreaking(),
     staleTime: 60_000,
   });
-  const items = data.length
-    ? data
-    : [
-        {
-          id: "x",
-          slug: "",
-          title: "Welcome to Entertainment Trends — the pulse of pop culture, refreshed nonstop.",
-        },
-      ];
-  const doubled = [...items, ...items];
+  if (!data.length) return null;
+
+  const doubled = [...data, ...data];
   return (
     <div className="yellow-bar overflow-hidden border-y border-black/20 relative">
       <div className="flex items-center">

@@ -32,138 +32,6 @@ export type Article = {
   category?: Category | null;
 };
 
-// Dummy data for fallback
-const DUMMY_CATEGORIES: Category[] = [
-  {
-    id: 1,
-    name: "Celebrity",
-    slug: "celebrity",
-    description: null,
-    sort_order: 1,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    name: "Movies & TV",
-    slug: "movies-tv",
-    description: null,
-    sort_order: 2,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    name: "Music",
-    slug: "music",
-    description: null,
-    sort_order: 3,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 4,
-    name: "Style",
-    slug: "style",
-    description: null,
-    sort_order: 4,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 5,
-    name: "Royals",
-    slug: "royals",
-    description: null,
-    sort_order: 5,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 6,
-    name: "Sports",
-    slug: "sports",
-    description: null,
-    sort_order: 6,
-    created_at: new Date().toISOString(),
-  },
-];
-
-let articlesStore: Article[] = [
-  {
-    id: 1,
-    slug: "celebrity-spotlight-a-list-event",
-    title: "A-Listers Turn Out For Star-Studded Premiere",
-    dek: "Hollywood's biggest names walked the red carpet last night for the year's most anticipated film premiere.",
-    body: `Hollywood Boulevard was abuzz last night as A-list celebrities arrived for the world premiere of the summer's biggest blockbuster. Stars arrived in style, showcasing the latest fashion trends on the red carpet. The evening was filled with laughter, excitement, and plenty of photo opportunities as fans lined the streets to catch a glimpse of their favorite actors.
-
-The film, which has been in production for over two years, is already generating massive buzz among critics and fans alike. With an all-star cast and a compelling storyline, it's set to be one of the biggest hits of the year.
-
-After the screening, the cast and crew attended an exclusive after-party where they celebrated the successful premiere. The party featured live music, gourmet food, and plenty of champagne as guests toasted to the film's success.
-
-Stay tuned for more updates on this exciting new release as it hits theaters worldwide next month.`,
-    hero_image_hd: "https://picsum.photos/seed/celebrity-red-carpet/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/celebrity-red-carpet/600/400",
-    hero_caption: null,
-    embed_url: null,
-    category_id: 1,
-    author_id: null,
-    status: "published",
-    is_breaking: true,
-    is_featured: true,
-    view_count: 15200,
-    published_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    category: DUMMY_CATEGORIES[0],
-  },
-  {
-    id: 2,
-    slug: "new-movie-trailer-leak",
-    title: "Exclusive: New Blockbuster Trailer Leaked Online",
-    dek: "A sneak peek of the year's most anticipated film has surfaced on social media.",
-    body: `In a surprising turn of events, a leaked trailer for the upcoming summer blockbuster has appeared on various social media platforms. The trailer, which appears to be an early cut, has already garnered millions of views within hours of its release.
-
-Studio representatives have yet to issue an official statement regarding the leak, but sources close to the production say they are investigating the matter thoroughly.
-
-Despite the leak, anticipation for the film remains higher than ever, with fans eagerly awaiting its official release.`,
-    hero_image_hd: "https://picsum.photos/seed/movie-trailer-leak/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/movie-trailer-leak/600/400",
-    hero_caption: null,
-    embed_url: null,
-    category_id: 2,
-    author_id: null,
-    status: "draft",
-    is_breaking: false,
-    is_featured: false,
-    view_count: 0,
-    published_at: null,
-    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    category: DUMMY_CATEGORIES[1],
-  },
-  {
-    id: 3,
-    slug: "old-movie-review-archive",
-    title: "Classic Film Retrospective: The Golden Age of Cinema",
-    dek: "Looking back at the films that defined an era.",
-    body: `This retrospective takes a deep dive into the classic films of the 1950s and 60s, exploring their lasting impact on modern cinema. From iconic performances to groundbreaking cinematography, these films continue to inspire filmmakers today.`,
-    hero_image_hd: "https://picsum.photos/seed/classic-films/1200/800",
-    hero_image_lq: "https://picsum.photos/seed/classic-films/600/400",
-    hero_caption: null,
-    embed_url: null,
-    category_id: 2,
-    author_id: null,
-    status: "archived",
-    is_breaking: false,
-    is_featured: false,
-    view_count: 3400,
-    published_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-    created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    category: DUMMY_CATEGORIES[1],
-  },
-];
-let nextArticleId = 4;
-
-let categoriesStore = [...DUMMY_CATEGORIES];
-let nextCategoryId = 7;
-
 export const articleService = {
   async listPublished(opts: { limit?: number; offset?: number; categorySlug?: string } = {}) {
     try {
@@ -182,15 +50,9 @@ export const articleService = {
       return { data, count: data.length };
     } catch (e) {
       console.error(e);
-      let filtered = [...articlesStore];
-      if (opts.categorySlug) {
-        filtered = filtered.filter((a) => a.category?.slug === opts.categorySlug);
-      }
-      const limit = opts.limit ?? 20;
-      const offset = opts.offset ?? 0;
       return {
-        data: filtered.slice(offset, offset + limit),
-        count: filtered.length,
+        data: [],
+        count: 0,
       };
     }
   },
@@ -202,7 +64,7 @@ export const articleService = {
       return (await res.json()) as Article;
     } catch (e) {
       console.error(e);
-      return articlesStore.find((a) => a.slug === slug) ?? null;
+      return null;
     }
   },
 
@@ -214,7 +76,7 @@ export const articleService = {
       return data.filter((a) => a.is_breaking).slice(0, 6);
     } catch (e) {
       console.error(e);
-      return articlesStore.filter((a) => a.is_breaking).slice(0, 6);
+      return [];
     }
   },
 
@@ -226,7 +88,7 @@ export const articleService = {
       return data.sort((a, b) => b.view_count - a.view_count).slice(0, limit);
     } catch (e) {
       console.error(e);
-      return [...articlesStore].sort((a, b) => b.view_count - a.view_count).slice(0, limit);
+      return [];
     }
   },
 
@@ -242,11 +104,7 @@ export const articleService = {
       );
     } catch (e) {
       console.error(e);
-      const term = q.trim().toLowerCase();
-      if (!term) return [];
-      return articlesStore.filter(
-        (a) => a.title.toLowerCase().includes(term) || a.dek?.toLowerCase().includes(term),
-      );
+      return [];
     }
   },
 
@@ -261,9 +119,7 @@ export const articleService = {
         .slice(0, limit);
     } catch (e) {
       console.error(e);
-      return articlesStore.filter(
-        (a) => a.category?.id === article.category_id && a.id !== article.id,
-      ).slice(0, limit);
+      return [];
     }
   },
 
@@ -344,7 +200,7 @@ export const categoryService = {
       return (await res.json()) as Category[];
     } catch (e) {
       console.error(e);
-      return categoriesStore;
+      return [];
     }
   },
   async create(input: Partial<Category>) {
@@ -360,18 +216,7 @@ export const categoryService = {
       }
       return await res.json();
     } catch (e) {
-      if (!(e instanceof TypeError)) throw e;
-      console.log("Using dummy data for category create, error:", e);
-      const newCategory: Category = {
-        id: nextCategoryId++,
-        name: input.name || "",
-        slug: input.slug || "",
-        description: input.description || null,
-        sort_order: input.sort_order || 0,
-        created_at: new Date().toISOString(),
-      };
-      categoriesStore.push(newCategory);
-      return newCategory;
+      throw e;
     }
   },
   async update(id: number, input: Partial<Category>) {
@@ -387,13 +232,6 @@ export const categoryService = {
       }
       return await res.json();
     } catch (e) {
-      if (!(e instanceof TypeError)) throw e;
-      console.log("Using dummy data for category update, error:", e);
-      const idx = categoriesStore.findIndex((c) => c.id === id);
-      if (idx >= 0) {
-        categoriesStore[idx] = { ...categoriesStore[idx], ...input };
-        return categoriesStore[idx];
-      }
       throw e;
     }
   },
@@ -407,9 +245,7 @@ export const categoryService = {
         throw new Error(payload?.error || "Failed to delete category");
       }
     } catch (e) {
-      if (!(e instanceof TypeError)) throw e;
-      console.log("Using dummy data for category remove, error:", e);
-      categoriesStore = categoriesStore.filter((c) => c.id !== id);
+      throw e;
     }
   },
   async delete(id: number) {
