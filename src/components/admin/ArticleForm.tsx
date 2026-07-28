@@ -14,6 +14,8 @@ import {
   Underline,
 } from "lucide-react";
 
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:3001/api";
+
 type Props = {
   initial?: Partial<Article>;
   onSaved: (a: any) => void;
@@ -70,7 +72,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
     try {
       const formData = new FormData();
       formData.append("image", file);
-      const response = await fetch("http://localhost:3001/api/upload", {
+      const response = await fetch(`${API_BASE}/upload`, {
         method: "POST",
         body: formData,
       });
