@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,13 +19,26 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as CategorySlugRouteImport } from './routes/category.$slug'
 import { Route as ArticleSlugRouteImport } from './routes/article.$slug'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSocialsRouteImport } from './routes/admin.socials'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminNewRouteImport } from './routes/admin.new'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminEditIdRouteImport } from './routes/admin.edit.$id'
 
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
+  id: '/privacy-policy',
+  path: '/privacy-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -61,9 +76,24 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSocialsRoute = AdminSocialsRouteImport.update({
+  id: '/socials',
+  path: '/socials',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminNewRoute = AdminNewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
@@ -81,9 +111,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
   '/search': typeof SearchRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/login': typeof AdminLoginRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/socials': typeof AdminSocialsRoute
   '/admin/users': typeof AdminUsersRoute
   '/article/$slug': typeof ArticleSlugRoute
   '/category/$slug': typeof CategorySlugRoute
@@ -93,9 +128,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
   '/search': typeof SearchRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/login': typeof AdminLoginRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/socials': typeof AdminSocialsRoute
   '/admin/users': typeof AdminUsersRoute
   '/article/$slug': typeof ArticleSlugRoute
   '/category/$slug': typeof CategorySlugRoute
@@ -107,9 +147,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
   '/search': typeof SearchRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/login': typeof AdminLoginRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/socials': typeof AdminSocialsRoute
   '/admin/users': typeof AdminUsersRoute
   '/article/$slug': typeof ArticleSlugRoute
   '/category/$slug': typeof CategorySlugRoute
@@ -122,9 +167,14 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/contact'
+    | '/privacy-policy'
     | '/search'
     | '/admin/categories'
+    | '/admin/login'
     | '/admin/new'
+    | '/admin/settings'
+    | '/admin/socials'
     | '/admin/users'
     | '/article/$slug'
     | '/category/$slug'
@@ -134,9 +184,14 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/contact'
+    | '/privacy-policy'
     | '/search'
     | '/admin/categories'
+    | '/admin/login'
     | '/admin/new'
+    | '/admin/settings'
+    | '/admin/socials'
     | '/admin/users'
     | '/article/$slug'
     | '/category/$slug'
@@ -147,9 +202,14 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/contact'
+    | '/privacy-policy'
     | '/search'
     | '/admin/categories'
+    | '/admin/login'
     | '/admin/new'
+    | '/admin/settings'
+    | '/admin/socials'
     | '/admin/users'
     | '/article/$slug'
     | '/category/$slug'
@@ -161,6 +221,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ContactRoute: typeof ContactRoute
+  PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   SearchRoute: typeof SearchRoute
   ArticleSlugRoute: typeof ArticleSlugRoute
   CategorySlugRoute: typeof CategorySlugRoute
@@ -173,6 +235,20 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy-policy': {
+      id: '/privacy-policy'
+      path: '/privacy-policy'
+      fullPath: '/privacy-policy'
+      preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -224,11 +300,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/socials': {
+      id: '/admin/socials'
+      path: '/socials'
+      fullPath: '/admin/socials'
+      preLoaderRoute: typeof AdminSocialsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/new': {
       id: '/admin/new'
       path: '/new'
       fullPath: '/admin/new'
       preLoaderRoute: typeof AdminNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/categories': {
@@ -250,7 +347,10 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
+  AdminLoginRoute: typeof AdminLoginRoute
   AdminNewRoute: typeof AdminNewRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSocialsRoute: typeof AdminSocialsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminEditIdRoute: typeof AdminEditIdRoute
@@ -258,7 +358,10 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
+  AdminLoginRoute: AdminLoginRoute,
   AdminNewRoute: AdminNewRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminSocialsRoute: AdminSocialsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminEditIdRoute: AdminEditIdRoute,
@@ -270,6 +373,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  ContactRoute: ContactRoute,
+  PrivacyPolicyRoute: PrivacyPolicyRoute,
   SearchRoute: SearchRoute,
   ArticleSlugRoute: ArticleSlugRoute,
   CategorySlugRoute: CategorySlugRoute,

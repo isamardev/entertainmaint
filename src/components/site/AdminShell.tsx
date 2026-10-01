@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import { AdminSidebar } from "@/components/site/AdminSidebar";
+import { useAuth } from "@/context/AuthContext";
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, loading, isAdmin } = useAuth();
+
+  if (loading || !user || !isAdmin) {
+    return <div className="min-h-screen bg-white">{children}</div>;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-white">

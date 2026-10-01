@@ -12,7 +12,7 @@ function articleImage(article: Article, alt = false) {
   if (!alt) return primary;
   if (secondary && secondary !== primary) return secondary;
   if (primary.includes("picsum.photos/seed/")) {
-    return primary.replace(/\/\d+\/\d+$/, "/900/675");
+    return primary.replace(/\/\d+\/\d+$/, "/1600/1200");
   }
   return primary;
 }
@@ -79,7 +79,7 @@ function Home() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <>
       <Helmet><title>Entertainment Trends — The Pulse of Pop Culture</title></Helmet>
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -106,27 +106,34 @@ function Home() {
                 {mobileSections.map((section, sectionIndex) => (
                   <div key={section.featured?.id ?? sectionIndex} className="space-y-5">
                     {section.featured && (
-                      <FeaturedArticle
-                        article={section.featured}
-                        isLoading={isLoading}
-                        keySuffix={`mobile-${sectionIndex}`}
-                        useAltImage={sectionIndex % 2 !== 0}
-                      />
+                      <div>
+                        <FeaturedArticle
+                          article={section.featured}
+                          isLoading={isLoading}
+                          keySuffix={`mobile-${sectionIndex}`}
+                          useAltImage={sectionIndex % 2 !== 0}
+                        />
+                      </div>
                     )}
 
                     {section.list.length > 0 && (
                       <div className="space-y-4">
                         {section.list.map((article, articleIndex) => (
-                          <ArticleCard
-                            key={`${article.id}-mobile-${articleIndex}`}
-                            article={article}
-                            horizontal
-                            size="sm"
-                            imageOverride={sectionIndex % 2 !== 0 ? articleImage(article, true) : undefined}
-                          />
+                          <div key={`${article.id}-mobile-${articleIndex}`}>
+                            <ArticleCard
+                              article={article}
+                              horizontal
+                              size="sm"
+                              imageOverride={sectionIndex % 2 !== 0 ? articleImage(article, true) : undefined}
+                            />
+                            {articleIndex < section.list.length - 1 && (
+                              <div className="mt-4 border-b border-gray-400" aria-hidden="true" />
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
+                    <div className="border-b border-gray-400" aria-hidden="true" />
                   </div>
                 ))}
               </div>
@@ -157,6 +164,8 @@ function Home() {
                         isLoading={isLoading}
                         keySuffix={`chunk-${chunkIndex}`}
                         useAltImage={chunkIndex % 2 !== 0}
+                        centerTitle={chunkIndex === 0}
+                        hideDek={chunkIndex === 0}
                       />
                     )}
 
@@ -201,7 +210,7 @@ function Home() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -210,11 +219,15 @@ function FeaturedArticle({
   isLoading,
   keySuffix = "",
   useAltImage = false,
+  centerTitle = false,
+  hideDek = false,
 }: {
   article?: Article;
   isLoading: boolean;
   keySuffix?: string;
   useAltImage?: boolean;
+  centerTitle?: boolean;
+  hideDek?: boolean;
 }) {
   if (isLoading && !article) {
     return <div className="aspect-[16/9] w-full animate-pulse bg-surface mb-10" />;
@@ -222,6 +235,7 @@ function FeaturedArticle({
   if (!article) return null;
 
   const img = articleImage(article, useAltImage);
+  const titleSize = "text-2xl font-black leading-[0.95] md:text-4xl lg:text-5xl";
 
   return (
     <section key={`featured${keySuffix}`} className="mb-10">
@@ -232,13 +246,14 @@ function FeaturedArticle({
           className="mb-4 aspect-[16/9] w-full overflow-hidden bg-surface"
           imgClassName="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
-        <h1 className="display text-3xl font-black leading-[0.95] md:text-5xl lg:text-6xl group-hover:text-black">
+        <h3 className={`display ${titleSize} group-hover:text-black text-center`}>
           {article.title}
-        </h1>
-        {article.dek && (
-          <p className="mt-3 text-base md:text-lg text-muted-foreground hidden md:block">{article.dek}</p>
+        </h3>
+        {article.dek && !hideDek && (
+          <p className="mt-2 text-sm md:text-sm text-muted-foreground hidden md:block">{article.dek}</p>
         )}
       </Link>
+      <div className="mt-10 border-b border-gray-400" aria-hidden="true" />
     </section>
   );
 }
@@ -261,16 +276,38 @@ function ArticleGrid({
       {isLoading ? (
         <GridSkeleton />
       ) : (
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {articles.map((a, i) => (
-            <ArticleCard
-              key={`${a.id}${keySuffix}-${i}`}
-              article={a}
-              imageOverride={useAltImage ? articleImage(a, true) : undefined}
-            />
-          ))}
+        <div className="relative">
+          <div className="grid gap-y-8 gap-x-10 sm:grid-cols-2 sm:gap-y-10 sm:gap-x-10 lg:grid-cols-3 lg:gap-x-12">
+            {articles.map((a, i) => (
+              <div key={`${a.id}${keySuffix}-${i}`} className="flex flex-col">
+                <ArticleCard
+                  article={a}
+                  imageOverride={useAltImage ? articleImage(a, true) : undefined}
+                />
+                {i < articles.length - 1 && (
+                  <div className="mt-8 block border-b border-gray-400 sm:hidden" aria-hidden="true" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* sm 2-col vertical divider — dead centre of the gap-x-10 */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-1/2 hidden -translate-x-1/2 w-px bg-gray-400 sm:block lg:hidden"
+          />
+          {/* lg 3-col vertical dividers — 2 lines at 33.33% and 66.66% horizontal, dead centre between cols */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-[33.3333%] hidden -translate-x-1/2 w-px bg-gray-400 lg:block"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-[66.6666%] hidden -translate-x-1/2 w-px bg-gray-400 lg:block"
+          />
         </div>
       )}
+      <div className="mt-10 border-b border-gray-400" aria-hidden="true" />
     </div>
   );
 }
@@ -288,13 +325,16 @@ function SplitArticleLayout({
   largeOnLeft: boolean;
   useAltImage?: boolean;
 }) {
-  const renderSmallArticle = (article: Article) => {
+  const renderSmallArticle = (article: Article, isLast: boolean) => {
     const img = articleImage(article, useAltImage);
     return (
       <Link
         key={article.id}
         to={`/article/${article.slug}`}
-        className="group flex min-h-0 flex-1 flex-col"
+        className={
+          "group flex min-h-0 flex-1 flex-col " +
+          (!isLast ? "pb-5 md:pb-6 border-b border-gray-400 mb-5 md:mb-6" : "")
+        }
       >
         <ArticleMedia
           article={article}
@@ -323,41 +363,44 @@ function SplitArticleLayout({
         className="relative mb-4 min-h-[220px] flex-1 overflow-hidden bg-surface sm:min-h-[280px]"
         imgClassName="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
       />
-      <div className="shrink-0 text-left">
-        <h2 className="display text-2xl font-black leading-[0.95] md:text-3xl group-hover:text-black">
+      <div className="shrink-0">
+        <h3 className="display text-2xl font-black leading-[0.95] md:text-3xl lg:text-4xl group-hover:text-black text-center">
           {largeArticle.title}
-        </h2>
+        </h3>
         {largeArticle.dek && (
-          <p className="mt-2 line-clamp-3 text-base text-muted-foreground">{largeArticle.dek}</p>
+          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{largeArticle.dek}</p>
         )}
       </div>
     </Link>
   );
 
   const smallStack = (
-    <div className="flex h-full min-h-0 flex-col gap-5 md:gap-6">
-      {renderSmallArticle(topArticle)}
-      {renderSmallArticle(bottomArticle)}
+    <div className="flex h-full min-h-0 flex-col md:gap-0">
+      {renderSmallArticle(topArticle, false)}
+      {renderSmallArticle(bottomArticle, true)}
     </div>
   );
 
   return (
-    <div
-      className={`mb-10 grid gap-6 md:min-h-[560px] md:items-stretch md:gap-5 ${
-        largeOnLeft ? "md:grid-cols-[3fr_2fr]" : "md:grid-cols-[2fr_3fr]"
-      }`}
-    >
-      {largeOnLeft ? (
-        <>
-          <div className="flex h-full min-h-0 flex-col">{largeBlock}</div>
-          <div className="flex h-full min-h-0 flex-col">{smallStack}</div>
-        </>
-      ) : (
-        <>
-          <div className="flex h-full min-h-0 flex-col">{smallStack}</div>
-          <div className="flex h-full min-h-0 flex-col">{largeBlock}</div>
-        </>
-      )}
+    <div className="mb-10">
+      <div
+        className={`grid gap-6 md:min-h-[560px] md:items-stretch md:gap-0 ${
+          largeOnLeft ? "md:grid-cols-[3fr_2fr]" : "md:grid-cols-[2fr_3fr]"
+        }`}
+      >
+        {largeOnLeft ? (
+          <>
+            <div className="flex h-full min-h-0 flex-col md:pr-5 md:border-r md:border-gray-400">{largeBlock}</div>
+            <div className="flex h-full min-h-0 flex-col md:pl-5">{smallStack}</div>
+          </>
+        ) : (
+          <>
+            <div className="flex h-full min-h-0 flex-col md:pr-5 md:border-r md:border-gray-400">{smallStack}</div>
+            <div className="flex h-full min-h-0 flex-col md:pl-5">{largeBlock}</div>
+          </>
+        )}
+      </div>
+      <div className="mt-4 border-b border-gray-400" aria-hidden="true" />
     </div>
   );
 }

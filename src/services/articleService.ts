@@ -1,5 +1,6 @@
 // Client-side article/category service using Node.js backend
 import { getApiUrl } from "@/lib/api";
+import { safeFetchJson } from "@/lib/safe-fetch";
 
 export type Category = {
   id: number;
@@ -39,100 +40,101 @@ export const articleService = {
       if (opts.limit) params.set("limit", opts.limit.toString());
       if (opts.offset) params.set("offset", opts.offset.toString());
 
-      const res = await fetch(getApiUrl(`/articles/published?${params}`));
-      if (!res.ok) throw new Error("Failed to fetch");
-      let data = (await res.json()) as Article[];
-
+      const result = await safeFetchJson<Article[]>(
+        getApiUrl(`/articles/published?${params}`),
+      );
+      if (!result.ok) {
+        return { data: [] as Article[], count: 0 };
+      }
+      let data = Array.isArray(result.data) ? result.data : [];
       if (opts.categorySlug) {
         data = data.filter((a) => a.category?.slug === opts.categorySlug);
       }
-
       return { data, count: data.length };
-    } catch (e) {
-      console.error(e);
-      return {
-        data: [],
-        count: 0,
-      };
+    } catch {
+      return { data: [] as Article[], count: 0 };
     }
   },
 
-  async getBySlug(slug: string) {
+  async getBySlug(slug: string): Promise<Article | null> {
     try {
-      const res = await fetch(getApiUrl(`/articles/slug/${slug}`));
-      if (!res.ok) return null;
-      return (await res.json()) as Article;
-    } catch (e) {
-      console.error(e);
+      const result = await safeFetchJson<Article>(getApiUrl(`/articles/slug/${slug}`));
+      return result.ok ? result.data : null;
+    } catch {
       return null;
     }
   },
 
-  async listBreaking() {
+  async listBreaking(): Promise<Article[]> {
     try {
-      const res = await fetch(getApiUrl("/articles/published"));
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = (await res.json()) as Article[];
-      return data.filter((a) => a.is_breaking).slice(0, 6);
-    } catch (e) {
-      console.error(e);
+      const result = await safeFetchJson<Article[]>(getApiUrl("/articles/published"));
+      if (!result.ok) return [];
+      return (Array.isArray(result.data) ? result.data : []).filter((a) => a.is_breaking).slice(0, 6);
+    } catch {
       return [];
     }
   },
 
-  async listTrending(limit = 6) {
+  async listTrending(limit = 6): Promise<Article[]> {
     try {
-      const res = await fetch(getApiUrl("/articles/published"));
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = (await res.json()) as Article[];
-      return data.sort((a, b) => b.view_count - a.view_count).slice(0, limit);
-    } catch (e) {
-      console.error(e);
+      const result = await safeFetchJson<Article[]>(getApiUrl("/articles/published"));
+      if (!result.ok) return [];
+      const data = Array.isArray(result.data) ? result.data : [];
+      const seenSlugs = new Set<string>();
+      return data
+        .slice()
+        .sort((a, b) => {
+          const aTime = a.published_at ? new Date(a.published_at).getTime() : new Date(a.created_at).getTime();
+          const bTime = b.published_at ? new Date(b.published_at).getTime() : new Date(b.created_at).getTime();
+          if (bTime !== aTime) return bTime - aTime;
+          return (b.view_count ?? 0) - (a.view_count ?? 0);
+        })
+        .filter((a) => {
+          const key = (a.slug || `${a.id}`).toLowerCase().trim();
+          if (seenSlugs.has(key)) return false;
+          seenSlugs.add(key);
+          return true;
+        })
+        .slice(0, limit);
+    } catch {
       return [];
     }
   },
 
-  async search(q: string) {
+  async search(q: string): Promise<Article[]> {
     try {
       const term = q.trim().toLowerCase();
       if (!term) return [];
-      const res = await fetch(getApiUrl("/articles/published"));
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = (await res.json()) as Article[];
+      const result = await safeFetchJson<Article[]>(getApiUrl("/articles/published"));
+      if (!result.ok) return [];
+      const data = Array.isArray(result.data) ? result.data : [];
       return data.filter(
         (a) => a.title.toLowerCase().includes(term) || a.dek?.toLowerCase().includes(term),
       );
-    } catch (e) {
-      console.error(e);
+    } catch {
       return [];
     }
   },
 
-  async related(article: Article, limit = 4) {
+  async related(article: Article, limit = 4): Promise<Article[]> {
     try {
       if (!article.category_id) return [];
-      const res = await fetch(getApiUrl("/articles/published"));
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = (await res.json()) as Article[];
+      const result = await safeFetchJson<Article[]>(getApiUrl("/articles/published"));
+      if (!result.ok) return [];
+      const data = Array.isArray(result.data) ? result.data : [];
       return data
         .filter((a) => a.category_id === article.category_id && a.id !== article.id)
         .slice(0, limit);
-    } catch (e) {
-      console.error(e);
+    } catch {
       return [];
     }
   },
 
   // Admin
-  async listAll() {
-    try {
-      const res = await fetch(getApiUrl("/articles?includeCategory=true"));
-      if (!res.ok) throw new Error("Failed to fetch articles");
-      return (await res.json()) as Article[];
-    } catch (e) {
-      console.error(e);
-      throw e; // Re-throw the error instead of falling back
-    }
+  async listAll(): Promise<Article[]> {
+    const result = await safeFetchJson<Article[]>(getApiUrl("/articles?includeCategory=true"));
+    if (!result.ok) throw new Error(result.error);
+    return Array.isArray(result.data) ? result.data : [];
   },
   async create(input: Partial<Article>) {
     const payload = {
@@ -152,114 +154,83 @@ export const articleService = {
       hero_caption: input.hero_caption || null,
       embed_url: input.embed_url || null,
     };
-    console.log("Creating article with payload:", payload);
-    const res = await fetch(getApiUrl("/articles"), {
+    const result = await safeFetchJson<any>(getApiUrl("/articles"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    console.log("Backend response status:", res.status);
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Backend error response:", errorText);
-      throw new Error(`Failed to create article: ${res.status} - ${errorText}`);
-    }
-    const result = await res.json();
-    console.log("Backend response:", result);
-    return result;
+    if (!result.ok) throw new Error(result.error);
+    return result.data;
   },
   async update(id: number, input: Partial<Article>) {
     const payload = { ...input };
     delete payload.created_at;
     delete payload.updated_at;
     delete payload.id;
-    const res = await fetch(getApiUrl(`/articles/${id}`), {
+    const result = await safeFetchJson<any>(getApiUrl(`/articles/${id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error("Failed to update article");
-    return await res.json();
+    if (!result.ok) throw new Error(result.error);
+    return result.data;
   },
   async remove(id: number) {
-    const res = await fetch(getApiUrl(`/articles/${id}`), {
-      method: "DELETE",
-    });
-    if (!res.ok) throw new Error("Failed to delete article");
+    const result = await safeFetchJson<any>(getApiUrl(`/articles/${id}`), { method: "DELETE" });
+    if (!result.ok) throw new Error(result.error);
   },
   async delete(id: number) {
     return this.remove(id);
-  }
+  },
 };
 
 export const categoryService = {
   async list(): Promise<Category[]> {
     try {
-      const res = await fetch(getApiUrl("/categories"));
-      if (!res.ok) throw new Error("Failed to fetch");
-      return (await res.json()) as Category[];
-    } catch (e) {
-      console.error(e);
+      const result = await safeFetchJson<Category[]>(getApiUrl("/categories"), {
+        cache: "no-store" as RequestCache,
+      });
+      if (!result.ok) return [];
+      return Array.isArray(result.data) ? result.data : [];
+    } catch {
       return [];
     }
   },
   async create(input: Partial<Category>) {
-    try {
-      const res = await fetch(getApiUrl("/categories"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...input, created_at: new Date().toISOString() }),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        throw new Error(payload?.error || "Failed to create category");
-      }
-      return await res.json();
-    } catch (e) {
-      throw e;
-    }
+    const result = await safeFetchJson<any>(getApiUrl("/categories"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store" as RequestCache,
+      body: JSON.stringify({ ...input, created_at: new Date().toISOString() }),
+    });
+    if (!result.ok) throw new Error(result.error);
+    return result.data;
   },
   async update(id: number, input: Partial<Category>) {
-    try {
-      const res = await fetch(getApiUrl(`/categories/${id}`), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...input }),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        throw new Error(payload?.error || "Failed to update category");
-      }
-      return await res.json();
-    } catch (e) {
-      throw e;
-    }
+    const result = await safeFetchJson<any>(getApiUrl(`/categories/${id}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input }),
+    });
+    if (!result.ok) throw new Error(result.error);
+    return result.data;
   },
   async remove(id: number) {
-    try {
-      const res = await fetch(getApiUrl(`/categories/${id}`), {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        throw new Error(payload?.error || "Failed to delete category");
-      }
-    } catch (e) {
-      throw e;
-    }
+    const result = await safeFetchJson<any>(getApiUrl(`/categories/${id}`), {
+      method: "DELETE",
+    });
+    if (!result.ok) throw new Error(result.error);
   },
   async delete(id: number) {
     return this.remove(id);
-  }
+  },
 };
 
 export const commentService = {
   async listForArticle(articleId: number) {
-    // Comments not implemented yet, return empty array
     return [];
   },
   async add(articleId: number, userId: string, body: string) {
-    // Comments not implemented yet, return dummy data
     return {
       id: Date.now(),
       article_id: articleId,

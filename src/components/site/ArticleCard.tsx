@@ -97,13 +97,18 @@ export function ArticleMedia({
   const lq = imageOverride ?? article.hero_image_lq ?? hd;
   const preview = getEmbedPreview(article.embed_url);
   const imageSrc = hd || preview?.image || "";
-  const imageFallback = lq || preview?.image || imageSrc;
 
   return (
     <div className={className}>
       {imageSrc ? (
         <picture>
-          <img src={imageFallback} alt={article.title} loading="lazy" className={imgClassName} />
+          <img
+            src={imageSrc}
+            alt={article.title}
+            loading="lazy"
+            decoding="async"
+            className={imgClassName}
+          />
         </picture>
       ) : preview ? (
         <div className="flex h-full w-full flex-col justify-between border border-gray-200 bg-white p-4 text-black">

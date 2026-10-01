@@ -1,13 +1,23 @@
-require("dotenv").config();
+require("./load-env.cjs");
 const mysql = require("mysql2/promise");
 const db = require("./models/index.cjs");
 const Category = require("./models/Category.cjs");
 
 const createDatabase = async () => {
-  if (process.env.DATABASE_URL || process.env.DB_DIALECT === "postgres") {
+  const explicitDialect = process.env.DB_DIALECT;
+  const useDatabaseUrl = Boolean(process.env.DATABASE_URL) && explicitDialect !== "mysql";
+
+  if (useDatabaseUrl || explicitDialect === "postgres") {
     console.log("Skipping CREATE DATABASE because Neon/Postgres database already exists.");
     return;
   }
+
+  if (process.env.DB_SKIP_CREATE_DATABASE === "true") {
+    console.log("Skipping CREATE DATABASE because DB_SKIP_CREATE_DATABASE=true.");
+    return;
+  }
+
+  const dbName = process.env.DB_NAME || "entertainment";
 
   // Create connection without specifying database first
   const connection = await mysql.createConnection({
@@ -18,8 +28,10 @@ const createDatabase = async () => {
   });
 
   try {
-    console.log("Creating database 'entertainmaint' if it doesn't exist...");
-    await connection.execute(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME || "entertainmaint"}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    console.log(`Creating database '${dbName}' if it doesn't exist...`);
+    await connection.execute(
+      `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+    );
     console.log("✅ Database created (or already exists)!");
   } catch (error) {
     console.error("Error creating database:", error);

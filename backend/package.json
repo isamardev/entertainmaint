@@ -1,0 +1,23 @@
+{
+  "name": "entertainmaint-backend",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "node -e \"console.log('build skipped: backend has no build step')\"",
+    "start": "node server.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "mysql2": "^3.23.0",
+    "pg": "^8.22.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.8",
+    "sequelize-auto": "^0.8.8"
+  }
+}

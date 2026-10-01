@@ -1,10 +1,18 @@
 const rawApiBase = (import.meta as any).env?.VITE_API_BASE_URL;
-const normalizedApiBase =
+const rawDevApiBase = (import.meta as any).env?.VITE_DEV_API_BASE_URL;
+
+const normalizedProdBase =
   typeof rawApiBase === "string" ? rawApiBase.trim().replace(/\/+$/, "") : "";
+const normalizedDevBase =
+  typeof rawDevApiBase === "string" && rawDevApiBase.trim()
+    ? rawDevApiBase.trim().replace(/\/+$/, "")
+    : normalizedProdBase;
 
 const isDev = Boolean((import.meta as any).env?.DEV);
 
-export const API_BASE = normalizedApiBase || (isDev ? "http://localhost:3001/api" : "");
+// Local and production both default to the live Hostinger backend.
+// VITE_DEV_API_BASE_URL can still override dev explicitly if needed.
+export const API_BASE = isDev ? normalizedDevBase : normalizedProdBase;
 
 export function getApiUrl(path: string) {
   if (!API_BASE) {

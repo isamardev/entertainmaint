@@ -61,11 +61,34 @@ function AdminArticles() {
         <h2 className="display text-xl font-black uppercase">{titleByStatus[statusFilter]}</h2>
       </div>
       {isLoading ? (
-        <div className="text-sm text-black">Loading…</div>
+        <div className="text-sm text-black">Loading articles…</div>
       ) : error ? (
-        <div className="border border-red-500 bg-red-50 p-4 text-red-800">
-          <p className="font-semibold">Error loading articles</p>
-          <p className="text-sm mt-1">{(error as any).message || "Unknown error"}</p>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-red-800">
+                Unable to load articles
+              </h3>
+              <p className="mt-1 text-sm text-red-700">
+                {(() => {
+                  const raw = (error as any)?.message as string | undefined;
+                  if (!raw) return "Please refresh the page and try again.";
+                  if (raw.includes("<") || raw.includes("DOCTYPE") || raw.startsWith("Unexpected token")) {
+                    return "Something went wrong. Please try again later.";
+                  }
+                  if (raw.length > 220) return raw.slice(0, 220) + "…";
+                  return raw;
+                })()}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => qc.invalidateQueries({ queryKey: ["admin-articles"] })}
+              className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto border border-gray-200">

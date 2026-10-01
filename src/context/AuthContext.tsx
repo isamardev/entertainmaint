@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
+import { adminAuthService, clearAdminToken, clearLegacyAdminStorage } from "@/services/adminAuthService";
 
 export type Role = "reader" | "admin" | "super_admin";
 
@@ -11,9 +12,11 @@ type AuthState = {
   loading: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  signIn: (email: string, password: string, remember?: boolean) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
+  updateEmail: (newEmail: string, currentPassword: string) => Promise<{ error?: string }>;
+  updatePassword: (newPassword: string, currentPassword: string) => Promise<{ error?: string }>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -22,35 +25,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  // Temporary dev admin state
   const [isDevAdmin, setIsDevAdmin] = useState(false);
+  const [devAdminEmail, setDevAdminEmail] = useState("");
 
   useEffect(() => {
-    // Check for dev admin in localStorage
-    const devAdmin = localStorage.getItem("dev_admin");
-    if (devAdmin === "true") {
-      setIsDevAdmin(true);
-      setRoles(["admin", "super_admin"]);
+    let active = true;
+
+    async function initAuth() {
+      clearLegacyAdminStorage();
+
+      const adminSession = await adminAuthService.me();
+      if (!active) return;
+
+      if (adminSession.ok) {
+        setIsDevAdmin(true);
+        setDevAdminEmail(adminSession.email);
+        setRoles(["admin", "super_admin"]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+        setSession(s);
+        if (s?.user) {
+          setTimeout(() => loadRoles(s.user.id), 0);
+        } else {
+          setRoles([]);
+        }
+      });
+
+      const { data } = await supabase.auth.getSession();
+      if (!active) {
+        sub.subscription.unsubscribe();
+        return;
+      }
+
+      setSession(data.session);
+      if (data.session?.user) {
+        await loadRoles(data.session.user.id);
+      }
       setLoading(false);
-      return;
+
+      return () => sub.subscription.unsubscribe();
     }
 
-    // Register listener first
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      if (s?.user) {
-        setTimeout(() => loadRoles(s.user.id), 0);
-      } else {
-        setRoles([]);
-      }
-    });
-    // Then check existing session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session?.user) loadRoles(data.session.user.id).finally(() => setLoading(false));
-      else setLoading(false);
-    });
-    return () => sub.subscription.unsubscribe();
+    const cleanupPromise = initAuth();
+
+    return () => {
+      active = false;
+      cleanupPromise.then((cleanup) => cleanup?.());
+    };
   }, []);
 
   async function loadRoles(uid: string) {
@@ -60,24 +84,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthState = {
     user: isDevAdmin
-      ? ({ id: "dev-admin-id", email: "admin@gmail.com" } as any)
+      ? ({ id: "dev-admin-id", email: devAdminEmail } as User)
       : (session?.user ?? null),
-    session: isDevAdmin ? ({} as any) : session,
+    session: isDevAdmin ? ({} as Session) : session,
     roles,
     loading,
     isAdmin: isDevAdmin || roles.includes("admin") || roles.includes("super_admin"),
     isSuperAdmin: isDevAdmin || roles.includes("super_admin"),
-    async signIn(email, password) {
-      // Temporary dev admin login
-      if (email === "admin@gmail.com" && password === "admin123") {
-        localStorage.setItem("dev_admin", "true");
-        setIsDevAdmin(true);
-        setRoles(["admin", "super_admin"]);
-        setLoading(false);
-        return { error: undefined };
-      }
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error: error?.message };
+    async signIn(email, password, remember = true) {
+      const result = await adminAuthService.login(email, password, remember);
+      if (result.error) return { error: result.error };
+
+      setIsDevAdmin(true);
+      setDevAdminEmail(result.email ?? "");
+      setRoles(["admin", "super_admin"]);
+      setLoading(false);
+      return {};
     },
     async signUp(email, password, displayName) {
       const { error } = await supabase.auth.signUp({
@@ -92,12 +114,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async signOut() {
       if (isDevAdmin) {
-        localStorage.removeItem("dev_admin");
+        clearAdminToken();
         setIsDevAdmin(false);
+        setDevAdminEmail("");
         setRoles([]);
         return;
       }
       await supabase.auth.signOut();
+    },
+    async updateEmail(newEmail, currentPassword) {
+      if (!isDevAdmin) {
+        const email = session?.user?.email;
+        if (!email) return { error: "Not signed in." };
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: currentPassword,
+        });
+        if (signInError) return { error: "Current password is incorrect." };
+        const { error } = await supabase.auth.updateUser({ email: newEmail });
+        return { error: error?.message };
+      }
+
+      const result = await adminAuthService.updateEmail(newEmail, currentPassword);
+      if (result.error) return { error: result.error };
+      if (result.email) setDevAdminEmail(result.email);
+      return {};
+    },
+    async updatePassword(newPassword, currentPassword) {
+      if (!isDevAdmin) {
+        const email = session?.user?.email;
+        if (!email) return { error: "Not signed in." };
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: currentPassword,
+        });
+        if (signInError) return { error: "Current password is incorrect." };
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        return { error: error?.message };
+      }
+
+      const result = await adminAuthService.updatePassword(newPassword, currentPassword);
+      return { error: result.error };
     },
   };
 

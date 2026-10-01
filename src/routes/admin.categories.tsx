@@ -12,7 +12,7 @@ export const Route = createFileRoute("/admin/categories")({ component: Categorie
 function CategoriesAdmin() {
   const { isSuperAdmin } = useAuth();
   const qc = useQueryClient();
-  const { data = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryService.list });
+  const { data = [], isLoading, error } = useQuery({ queryKey: ["categories"], queryFn: categoryService.list });
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -64,7 +64,36 @@ function CategoriesAdmin() {
     <div className="grid h-full min-h-0 gap-8 lg:grid-cols-2">
       <div className="flex min-h-0 flex-col">
         <h2 className="display mb-4 shrink-0 text-xl font-black uppercase">Categories</h2>
-        <div className="min-h-0 flex-1 overflow-auto border border-gray-200">
+        {isLoading ? (
+          <div className="text-sm text-black border border-gray-200 p-3">Loading categories…</div>
+        ) : error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-red-800">Unable to load categories</h3>
+                <p className="mt-1 text-sm text-red-700">
+                  {(() => {
+                    const raw = (error as any)?.message as string | undefined;
+                    if (!raw) return "Please refresh the page and try again.";
+                    if (raw.includes("<") || raw.includes("DOCTYPE") || raw.startsWith("Unexpected token")) {
+                      return "Something went wrong. Please try again later.";
+                    }
+                    if (raw.length > 220) return raw.slice(0, 220) + "…";
+                    return raw;
+                  })()}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => qc.invalidateQueries({ queryKey: ["categories"] })}
+                className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-100"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-auto border border-gray-200">
           {data.map((c) => (
             <div
               key={c.id}
@@ -99,7 +128,8 @@ function CategoriesAdmin() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
       <form onSubmit={save} className="space-y-3 border border-gray-200 bg-gray-50 p-4">
         <div className="text-xs font-black uppercase tracking-widest text-black">

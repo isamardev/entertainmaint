@@ -1,0 +1,68 @@
+# =============================================================
+# BACKEND .htaccess — HOSTINGER SHARED PASSENGER NODE
+# Domain: https://aliceblue-goose-490382.hostingersite.com
+# Folder: /home/u695701224/domains/aliceblue-goose-490382.hostingersite.com/hbuilds/current/nodejs/
+# (same folder as server.cjs + package.json)
+#
+# RULE #1: NO fancy directives that can trigger 403 Forbidden on Hostinger.
+# RULE #2: NO <Files> / <DirectoryMatch> require-deny blocks (they often
+#          block Passenger startup files too on shared hosting).
+# RULE #3: NO `expr=` origin match — Hostinger LiteSpeed does not support
+#          %{req:Origin}; the Node app echoes correct ACAO itself.
+# =============================================================
+
+# ------- (A) Auth & HTTPS passthrough -------
+CGIPassAuth On
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+RequestHeader set X-Forwarded-Proto "https"
+
+# ------- (B) Disable Apache HTML error override (HIDDEN CORS FIX) -------
+<IfModule mod_proxy.c>
+  ProxyErrorOverride Off
+</IfModule>
+<IfModule LiteSpeed>
+  ProxyErrorOverride Off
+  LsapiDisableAdminCheck On
+  LiteSpeed-Cache-Control no-cache
+</IfModule>
+
+# ------- (C) OPTIONS preflight — early 204, no body -------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_METHOD} =OPTIONS
+  RewriteRule ^ - [R=204,L]
+</IfModule>
+
+# ------- (D) Brute headers. ACAO comes from Node (server.cjs L100-L138). -------
+<IfModule mod_headers.c>
+  Header always set X-Backend "node-express"
+  Header always set Vary "Origin, Accept-Encoding"
+  Header always set Access-Control-Allow-Methods "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"
+  Header always set Access-Control-Allow-Headers "Accept, Accept-Language, Authorization, Cache-Control, Content-Language, Content-Type, If-None-Match, Origin, X-Requested-With"
+  Header always set Access-Control-Expose-Headers "Content-Disposition, X-Total-Count"
+  Header always set Access-Control-Max-Age "86400"
+  # Blow away any stale ACAO from parent. Node sets the correct one.
+  Header always unset Access-Control-Allow-Origin
+</IfModule>
+
+# ------- (E) Passenger app declaration — ONLY what Hostinger uses -------
+PassengerAppRoot /home/u695701224/domains/aliceblue-goose-490382.hostingersite.com/hbuilds/current/nodejs
+PassengerAppType node
+PassengerNodejs /opt/alt/alt-nodejs24/root/bin/node
+PassengerStartupFile server.cjs
+PassengerBaseURI /
+
+# ------- (F) Node / Hostinger env -------
+SetEnv NODE_OPTIONS "--require /home/u695701224/domains/aliceblue-goose-490382.hostingersite.com/hbuilds/config/preload-timestamp.js"
+SetEnv LSNODE_CONSOLE_LOG console.log
+SetEnv NODE_ENV production
+
+# ------- (G) ONLY the safest possible deny lines — hidden files + .env -------
+# We deny ONLY dotfiles that are accessible via URL (the ones starting with .).
+# Do NOT block server.cjs / package.json via <Files> — on some Hostinger plans
+# Passenger touches those during startup and denied access gives 403.
+<FilesMatch "^\..*$">
+  Require all denied
+</FilesMatch>
+
+Options -Indexes -MultiViews

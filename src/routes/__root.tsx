@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
@@ -19,6 +19,7 @@ import { TrendingBar } from "@/components/site/TrendingBar";
 import { AdminShell } from "@/components/site/AdminShell";
 import { supabase } from "@/integrations/supabase/client";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
+import { useScrollDirection } from "@/lib/use-scroll-direction";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -121,15 +122,43 @@ function RootComponent() {
     );
   }
 
+  const showTrending = isArticlePage;
+  const { direction, atTop } = useScrollDirection(10);
+  const headerWrapRef = useRef<HTMLDivElement | null>(null);
+
+  // Hide rule: only when user scrolls DOWN, AND they have scrolled PAST the header (not
+  // still near the top). Otherwise the header is always visible (up-scroll or top-of-page).
+  const hideHeader = direction === "down" && !atTop;
+
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <div className="flex min-h-screen flex-col">
-            <Navbar />
-            {isArticlePage && <TrendingBar />}
+            {/* Smart sticky header: scroll DOWN → slide out, scroll UP → slide back in.
+                Uses CSS transition on transform + will-change for smooth GPU composite. */}
+            <div
+              ref={headerWrapRef}
+              className={
+                "sticky top-0 z-50 w-full will-change-transform transition-transform duration-300 ease-in-out " +
+                (hideHeader ? "-translate-y-full" : "translate-y-0")
+              }
+              style={{ background: "transparent" }}
+            >
+              <Navbar />
+              {/* Mobile (screen < md = <768px): hide yellow stripe + TrendingBar entirely.
+                  md+ (tablet / desktop): render them normally with the sticky header. */}
+              {showTrending && <div className="hidden h-3 w-full bg-[var(--color-yellow)] border-0 md:block" role="presentation" />}
+              {showTrending && (
+                <div className="hidden md:block">
+                  <TrendingBar />
+                </div>
+              )}
+            </div>
             <main className="flex-1">
-              <Outlet />
+              <div className="container py-6 md:py-10">
+                <Outlet />
+              </div>
             </main>
             <Footer />
           </div>

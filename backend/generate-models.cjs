@@ -1,10 +1,12 @@
-require("dotenv").config();
+require("./load-env.cjs");
 const SequelizeAuto = require("sequelize-auto");
 
 const databaseUrl = process.env.DATABASE_URL;
-const dialect = process.env.DB_DIALECT || (databaseUrl ? "postgres" : "mysql");
+const explicitDialect = process.env.DB_DIALECT;
+const useDatabaseUrl = Boolean(databaseUrl) && explicitDialect !== "mysql";
+const dialect = explicitDialect || (useDatabaseUrl ? "postgres" : "mysql");
 
-const auto = databaseUrl
+const auto = useDatabaseUrl
   ? new SequelizeAuto(databaseUrl, "", "", {
       dialect,
       directory: "./backend/models",

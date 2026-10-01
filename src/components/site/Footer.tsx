@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Facebook, Instagram, Twitter, Youtube } from "lucide-react";
 import { articleService, categoryService } from "@/services/articleService";
+import { SocialFollowLinks } from "@/components/site/SocialFollowLinks";
 
 export function Footer() {
   const { data: categories = [] } = useQuery({
@@ -18,7 +18,7 @@ export function Footer() {
 
   return (
     <footer className="mt-16 border-t border-border bg-surface">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 md:grid-cols-4">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 md:grid-cols-5">
         <div>
           <img
             src="/logo.png"
@@ -45,6 +45,17 @@ export function Footer() {
           </ul>
         </div>
         <div>
+          <div className="eyebrow mb-3">Pages</div>
+          <ul className="space-y-1 text-sm">
+            <li>
+              <Link to="/contact">Contact Us</Link>
+            </li>
+            <li>
+              <Link to="/privacy-policy">Privacy Policy</Link>
+            </li>
+          </ul>
+        </div>
+        <div>
           <div className="eyebrow mb-3">Latest</div>
           <ul className="space-y-2 text-sm">
             {latestArticles.map((article) => (
@@ -58,20 +69,7 @@ export function Footer() {
         </div>
         <div>
           <div className="eyebrow mb-3">Follow</div>
-          <div className="flex gap-3">
-            <a className="rounded border border-border p-2 hover:border-yellow hover:text-yellow">
-              <Twitter size={16} />
-            </a>
-            <a className="rounded border border-border p-2 hover:border-yellow hover:text-yellow">
-              <Facebook size={16} />
-            </a>
-            <a className="rounded border border-border p-2 hover:border-yellow hover:text-yellow">
-              <Instagram size={16} />
-            </a>
-            <a className="rounded border border-border p-2 hover:border-yellow hover:text-yellow">
-              <Youtube size={16} />
-            </a>
-          </div>
+          <SocialFollowLinks />
         </div>
       </div>
       <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">

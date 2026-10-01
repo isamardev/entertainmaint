@@ -9,10 +9,9 @@ export const Route = createFileRoute("/admin/users")({ component: UsersAdmin });
 function UsersAdmin() {
   const { isSuperAdmin } = useAuth();
   const qc = useQueryClient();
-  const { data = [] } = useQuery({
+  const { data = [], isLoading, error } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      // Super admin can see all user_roles thanks to RLS
       const { data, error } = await supabase
         .from("user_roles")
         .select("user_id, role, profile:profiles(display_name, avatar_url)")
@@ -50,6 +49,32 @@ function UsersAdmin() {
   return (
     <div>
       <h2 className="display mb-4 text-xl font-black uppercase">Users &amp; Roles</h2>
+      {isLoading ? (
+        <div className="text-sm text-black border border-gray-200 p-3">Loading users…</div>
+      ) : error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-red-800">Unable to load users</h3>
+              <p className="mt-1 text-sm text-red-700">
+                {(() => {
+                  const raw = (error as any)?.message as string | undefined;
+                  if (!raw) return "Please refresh the page and try again.";
+                  if (raw.length > 220) return raw.slice(0, 220) + "…";
+                  return raw;
+                })()}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => qc.invalidateQueries({ queryKey: ["admin-users"] })}
+              className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="border border-gray-200">
         {[...byUser.entries()].map(([uid, u]) => (
           <div
@@ -78,7 +103,10 @@ function UsersAdmin() {
           <div className="p-8 text-center text-black">No users yet.</div>
         )}
       </div>
-      <p className="text-xs text-black mt-4">Click a role tag to toggle it for that user.</p>
+      )}
+      {!isLoading && !error && (
+        <p className="text-xs text-black mt-4">Click a role tag to toggle it for that user.</p>
+      )}
     </div>
   );
 }

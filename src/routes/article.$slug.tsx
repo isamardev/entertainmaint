@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { articleService } from "@/services/articleService";
 import { ArticleCard } from "@/components/site/ArticleCard";
 import { ShareButtons } from "@/components/site/ShareButtons";
 import { TrendingSidebar } from "@/components/site/Sidebar";
-import { fullDate } from "@/lib/format";
+import { shortDate } from "@/lib/format";
 
 export const Route = createFileRoute("/article/$slug")({
   loader: async ({ params }) => {
@@ -58,6 +58,7 @@ export const Route = createFileRoute("/article/$slug")({
 
 function ArticlePage() {
   const { article } = Route.useLoaderData();
+  const proseRef = useRef<HTMLDivElement | null>(null);
   const { data: related = [] } = useQuery({
     queryKey: ["related", article.id],
     queryFn: () => articleService.related(article),
@@ -70,13 +71,118 @@ function ArticlePage() {
   const url = typeof window !== "undefined" ? window.location.href : `/article/${article.slug}`;
   const articleBodyHtml = formatArticleBody(article.body);
 
+  useEffect(() => {
+    if (!proseRef.current || typeof document === "undefined") return;
+    const root = proseRef.current;
+    const hasTwitter = !!root.querySelector("blockquote.twitter-tweet");
+    const hasInstagram = !!root.querySelector("blockquote.instagram-media");
+    const hasTiktok = !!root.querySelector("blockquote.tiktok-embed");
+    const hasFacebook = !!root.querySelector("blockquote.fb-post");
+
+    // Twitter / X
+    if (hasTwitter) {
+      const load = () => {
+        try {
+          const w = window as any;
+          if (w.twttr?.widgets?.load) w.twttr.widgets.load(root);
+        } catch {}
+      };
+      const existing = document.querySelector(
+        'script[src="https://platform.twitter.com/widgets.js"]',
+      ) as HTMLScriptElement | null;
+      if (existing && (window as any).twttr?.widgets?.load) {
+        setTimeout(load, 0);
+      } else {
+        const s = existing ?? document.createElement("script");
+        s.async = true;
+        s.defer = true;
+        s.src = "https://platform.twitter.com/widgets.js";
+        s.onload = () => setTimeout(load, 60);
+        s.onerror = () => {};
+        if (!existing) document.body.appendChild(s);
+      }
+    }
+
+    // Instagram
+    if (hasInstagram) {
+      const process = () => {
+        try {
+          const w = window as any;
+          if (w.instgrm?.Embeds?.process) w.instgrm.Embeds.process();
+        } catch {}
+      };
+      const existing = document.querySelector(
+        'script[src="https://www.instagram.com/embed.js"]',
+      ) as HTMLScriptElement | null;
+      if (existing && (window as any).instgrm?.Embeds?.process) {
+        setTimeout(process, 0);
+      } else {
+        const s = existing ?? document.createElement("script");
+        s.async = true;
+        s.defer = true;
+        s.src = "https://www.instagram.com/embed.js";
+        s.onload = () => setTimeout(process, 60);
+        s.onerror = () => {};
+        if (!existing) document.body.appendChild(s);
+      }
+    }
+
+    // TikTok
+    if (hasTiktok) {
+      const existing = document.querySelector(
+        'script[src="https://www.tiktok.com/embed.js"]',
+      ) as HTMLScriptElement | null;
+      if (!existing) {
+        const s = document.createElement("script");
+        s.async = true;
+        s.defer = true;
+        s.src = "https://www.tiktok.com/embed.js";
+        s.onerror = () => {};
+        document.body.appendChild(s);
+      }
+    }
+
+    // Facebook
+    if (hasFacebook) {
+      const ensureRoot = () => {
+        if (!document.getElementById("fb-root")) {
+          const r = document.createElement("div");
+          r.id = "fb-root";
+          document.body.prepend(r);
+        }
+      };
+      const parse = () => {
+        try {
+          const w = window as any;
+          if (w.FB?.XFBML?.parse) w.FB.XFBML.parse(root);
+        } catch {}
+      };
+      ensureRoot();
+      const existing = document.querySelector(
+        'script[src="https://connect.facebook.net/en_US/sdk.js"]',
+      ) as HTMLScriptElement | null;
+      if (existing && (window as any).FB?.XFBML?.parse) {
+        setTimeout(parse, 0);
+      } else {
+        const s = existing ?? document.createElement("script");
+        s.async = true;
+        s.defer = true;
+        s.src = "https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0";
+        s.crossOrigin = "anonymous";
+        s.onload = () => setTimeout(parse, 80);
+        s.onerror = () => {};
+        if (!existing) document.body.appendChild(s);
+      }
+    }
+  }, [articleBodyHtml]);
+
   const readNext = trending.slice(0, 3);
   const nineGrid = trending.slice(0, 9);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
-        <div className="max-w-4xl">
+    <>
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="max-w-4xl min-w-0">
           <header className="mb-6">
             <h1 className="display text-3xl font-black uppercase leading-[0.95] md:text-5xl lg:text-6xl">
               {article.title}
@@ -89,7 +195,14 @@ function ArticlePage() {
                   <div className="eyebrow">{article.category.name}</div>
                 </Link>
               )}
-              <span>{fullDate(article.published_at)}</span>
+              {(() => {
+                const published = article.published_at ? new Date(article.published_at).getTime() : 0;
+                const updated = article.updated_at ? new Date(article.updated_at).getTime() : 0;
+                if (published && updated - published > 5000) {
+                  return <span>Updated {shortDate(article.updated_at)}</span>;
+                }
+                return <span>{shortDate(article.published_at)}</span>;
+              })()}
             </div>
           </header>
 
@@ -103,7 +216,8 @@ function ArticlePage() {
           )}
 
           <div
-            className="prose prose-lg max-w-none text-lg leading-relaxed prose-headings:font-black prose-headings:uppercase prose-a:text-black prose-strong:text-black"
+            ref={proseRef}
+            className="prose prose-lg max-w-none text-lg leading-relaxed prose-headings:font-black prose-headings:uppercase prose-a:text-blue-700 prose-a:no-underline hover:prose-a:underline prose-a:font-semibold prose-strong:text-black"
             dangerouslySetInnerHTML={{ __html: articleBodyHtml }}
           />
 
@@ -163,7 +277,7 @@ function ArticlePage() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -171,28 +285,278 @@ function formatArticleBody(body: string) {
   const trimmed = (body || "").trim();
   if (!trimmed) return "<p></p>";
 
+  let enriched = trimmed;
   if (/<[a-z][\s\S]*>/i.test(trimmed)) {
-    return sanitizeRichText(trimmed);
+    enriched = sanitizeRichText(trimmed);
+  } else {
+    enriched = trimmed
+      .split(/\n\n+/)
+      .map((para) => `<p>${escapeHtml(para).replace(/\n/g, "<br />")}</p>`)
+      .join("");
   }
 
-  return trimmed
-    .split(/\n\n+/)
-    .map((para) => `<p>${escapeHtml(para).replace(/\n/g, "<br />")}</p>`)
-    .join("");
+  // Enrich: wrap bare (non-figured) iframes in responsive 16:9 wrapper for mobile/desktop
+  // Also normalize YouTube/Vimeo iframes src policy-friendly
+  enriched = enriched.replace(
+    /(<iframe\b[^>]*><\/iframe>)/gi,
+    (_m, iframe) => {
+      const insideFigure = /<figure[\s\S]*<\/figure>/i.test(iframe);
+      if (insideFigure) return iframe;
+      const hasWrapper = /<div[^>]*aspect-video/i.test(iframe);
+      if (hasWrapper) return iframe;
+      return `<figure class="my-8 w-full max-w-none"><div class="aspect-video w-full overflow-hidden rounded border border-gray-200 bg-black">${iframe}</div></figure>`;
+    },
+  );
+
+  // Wrap standalone video tags (non-figured) in responsive container
+  enriched = enriched.replace(
+    /(<video\b[^>]*>(?:[\s\S]*?<\/video>|<video\b[^>]*\/>))/gi,
+    (_m, videoTag) => {
+      const insideFigure = /<figure[\s\S]*<\/figure>/i.test(videoTag);
+      if (insideFigure) return videoTag;
+      return `<figure class="my-8 w-full max-w-none"><div class="w-full overflow-hidden rounded border border-gray-200 bg-black">${videoTag}</div></figure>`;
+    },
+  );
+
+  // Wrap known inline social embed blockquotes (twitter/instagram/facebook/tiktok) in a responsive figure so they match inline image/video spacing
+  const embedBQRe = /<figure[^>]*>\s*(<blockquote\s+class="(?:twitter-tweet|instagram-media|fb-post|tiktok-embed)"[^>]*>[\s\S]*?<\/blockquote>)\s*<\/figure>/gi;
+  const standaloneBQRe = /(<blockquote\s+class="(?:twitter-tweet|instagram-media|fb-post|tiktok-embed)"[^>]*>[\s\S]*?<\/blockquote>)(?!\s*<\/figure>)/gi;
+  const wrapEmbed = (bq: string) =>
+    `<figure class="inline-embed my-8 w-full max-w-none overflow-hidden rounded border border-gray-200 bg-white p-3">${bq}</figure>`;
+  enriched = enriched.replace(embedBQRe, (_m: string, bq: string) => wrapEmbed(bq));
+  enriched = enriched.replace(standaloneBQRe, (_m: string, bq: string) => wrapEmbed(bq));
+
+  // Ensure inline images outside figures look good too
+  enriched = enriched.replace(
+    /(<img\b[^>]*>)(?!\s*<\/figcaption>|<\/a><\/figure>|<\/source>|<\/video>)/gi,
+    (_m, img) => {
+      if (/class="[^"]*w-full/.test(img) || /<figure[\s\S]*$/i.test(img)) return img;
+      return `<figure class="my-6 flex flex-col items-center">${img.replace(/^<img\b/i, '<img class="w-full max-w-full rounded border border-gray-200 bg-gray-50" loading="lazy"')}</figure>`;
+    },
+  );
+
+  // Strip all figcaptions — we never want filename captions on inline body media
+  enriched = enriched.replace(/<figcaption\b[^>]*>[\s\S]*?<\/figcaption>/gi, "");
+
+  return enriched;
 }
 
 function sanitizeRichText(html: string) {
   let safe = html;
 
+  // Layer 0: strip HTML comments entirely
+  safe = safe.replace(/<!--[\s\S]*?-->/g, "");
+
+  // Layer 0b: eliminate entity-escaped dangerous tags that would render
+  // as raw visible text after dangerouslySetInnerHTML
+  safe = safe.replace(/&lt;script[\s\S]*?&gt;[\s\S]*?&lt;\/script&gt;/gi, "");
+  safe = safe.replace(/&lt;style[\s\S]*?&gt;[\s\S]*?&lt;\/style&gt;/gi, "");
+  safe = safe.replace(/&lt;noscript[\s\S]*?&gt;[\s\S]*?&lt;\/noscript&gt;/gi, "");
+  safe = safe.replace(/&lt;template[\s\S]*?&gt;[\s\S]*?&lt;\/template&gt;/gi, "");
+  safe = safe.replace(/&lt;svg[\s\S]*?&gt;[\s\S]*?&lt;\/svg&gt;/gi, "");
+
+  // Layer 1: remove entire blocks (tag + content) that must never exist inside article HTML
+  safe = safe.replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "");
+  safe = safe.replace(/<noscript[\s\S]*?>[\s\S]*?<\/noscript>/gi, "");
+  safe = safe.replace(/<template[\s\S]*?>[\s\S]*?<\/template>/gi, "");
+  safe = safe.replace(/<svg[\s\S]*?>[\s\S]*?<\/svg>/gi, "");
+  safe = safe.replace(/<object[\s\S]*?>[\s\S]*?<\/object>/gi, "");
+  safe = safe.replace(/<embed[\s\S]*?\/?>/gi, "");
+  safe = safe.replace(/<applet[\s\S]*?>[\s\S]*?<\/applet>/gi, "");
+  safe = safe.replace(/<form[\s\S]*?>[\s\S]*?<\/form>/gi, "");
+  safe = safe.replace(/<input[\s\S]*?\/?>/gi, "");
+  safe = safe.replace(/<button[\s\S]*?>[\s\S]*?<\/button>/gi, "");
+  safe = safe.replace(/<textarea[\s\S]*?>[\s\S]*?<\/textarea>/gi, "");
+  safe = safe.replace(/<select[\s\S]*?>[\s\S]*?<\/select>/gi, "");
+
+  // Layer 2: classic script + event-handler sanitization
   safe = safe.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
-  safe = safe.replace(/\son\w+="[^"]*"/gi, "");
-  safe = safe.replace(/\son\w+='[^']*'/gi, "");
+  safe = safe.replace(/\son\w+(\s)*=(\s)*"[^"]*"/gi, "");
+  safe = safe.replace(/\son\w+(\s)*=(\s)*'[^']*'/gi, "");
+  // Also catch unquoted event-handler assignments (onerror=alert(1))
+  safe = safe.replace(/\son\w+(\s)*=(\s)*[^\s>]+/gi, "");
   safe = safe.replace(/javascript:/gi, "");
+  safe = safe.replace(/vbscript:/gi, "");
+  safe = safe.replace(/data:text\/html/gi, "");
 
   const allowedTags =
-    /<\/?(div|p|span|br|strong|b|em|i|u|h2|h3|ul|ol|li|blockquote|a)\b[^>]*>/gi;
+    /<\/?(div|p|span|br|strong|b|em|i|u|h2|h3|h4|ul|ol|li|blockquote|a|figure|figcaption|img|iframe|video|source|section)\b[^>]*>/gi;
+  const isSelfClosing = (raw: string) => /\/\s*>$/.test(raw);
 
-  return safe.replace(/<\/?[^>]+>/gi, (tag) => (tag.match(allowedTags) ? tag : ""));
+  return safe.replace(/<\/?[^>]+>/gi, (tag) => {
+    const ok = tag.match(allowedTags);
+    if (!ok) return "";
+    // Closing tags pass through untouched
+    if (/^<\//.test(tag)) return tag;
+
+    // Blockquote: keep class, lang, dir, cite, data-*
+    if (/^<blockquote\b/i.test(tag)) {
+      const attrs: string[] = [];
+      const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
+      if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
+      const cite = (tag.match(/\scite="([^"]*)"/i) || tag.match(/\scite='([^']*)'/i) || [])[1];
+      if (cite) {
+        try {
+          const u = new URL(cite);
+          if (u.protocol === "http:" || u.protocol === "https:") attrs.push(`cite="${u.toString().replace(/"/g, "&quot;")}"`);
+        } catch { /* ignore */ }
+      }
+      const lang = (tag.match(/\slang="([^"]*)"/i) || [])[1];
+      if (lang && /^[a-zA-Z0-9_-]+$/.test(lang)) attrs.push(`lang="${lang}"`);
+      const dir = (tag.match(/\sdir="([^"]*)"/i) || [])[1];
+      if (dir === "ltr" || dir === "rtl" || dir === "auto") attrs.push(`dir="${dir}"`);
+      const dataRe = /\sdata-([a-zA-Z0-9_-]+)="([^"]*)"/g;
+      let dm: RegExpExecArray | null;
+      while ((dm = dataRe.exec(tag))) {
+        const key = `data-${dm[1].toLowerCase()}`;
+        if (attrs.some((a) => a.startsWith(`${key}="`))) continue;
+        const val = String(dm[2]).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        attrs.push(`${key}="${val}"`);
+      }
+      const close = isSelfClosing(tag) ? " />" : ">";
+      return `<blockquote${attrs.length ? " " + attrs.join(" ") : ""}${close}`;
+    }
+
+    // Figure: keep class + data-*
+    if (/^<figure\b/i.test(tag)) {
+      const attrs: string[] = [];
+      const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
+      if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
+      const dataRe = /\sdata-([a-zA-Z0-9_-]+)="([^"]*)"/g;
+      let dm: RegExpExecArray | null;
+      while ((dm = dataRe.exec(tag))) {
+        const key = `data-${dm[1].toLowerCase()}`;
+        if (attrs.some((a) => a.startsWith(`${key}="`))) continue;
+        const val = String(dm[2]).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        attrs.push(`${key}="${val}"`);
+      }
+      const close = isSelfClosing(tag) ? " />" : ">";
+      return `<figure${attrs.length ? " " + attrs.join(" ") : ""}${close}`;
+    }
+
+    // Media + anchor tags: keep existing, strip dangerous attrs already handled in layers above
+    if (/^<(?:img|iframe|video|source|a)\b/i.test(tag)) {
+      // Basic attribute safety pass: keep attributes but strip any leftover event handlers
+      let clean = tag;
+      clean = clean.replace(/\son\w+(\s)*=(\s)*"[^"]*"/gi, "");
+      clean = clean.replace(/\son\w+(\s)*=(\s)*'[^']*'/gi, "");
+      clean = clean.replace(/\son\w+(\s)*=(\s)*[^\s>]+/gi, "");
+      clean = clean.replace(/javascript:/gi, "");
+      // Ensure it ends with closing >
+      if (!/>$/.test(clean)) clean = clean.replace(/\s*$/, ">");
+      return clean;
+    }
+
+    // Structural tags: keep only valid class + proper close bracket
+    if (/^<(figcaption|div|p|span|ul|ol|li|section|br|strong|b|em|i|u|h2|h3|h4)\b/i.test(tag)) {
+      const m = tag.match(/^<(figcaption|div|p|span|ul|ol|li|section|br|strong|b|em|i|u|h2|h3|h4)\b/i);
+      if (!m) return tag;
+      const tagName = m[1].toLowerCase();
+      const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
+      const close = isSelfClosing(tag) ? " />" : ">";
+      if (clazz && /^[\w\s-]+$/.test(clazz)) {
+        return `<${tagName} class="${clazz}"${close}`;
+      }
+      return `<${tagName}${close}`;
+    }
+
+    return tag;
+  });
+
+  // Layer 3 (post-sanitization): collapse RAW-PASTED social widget blockquotes
+  // that contain their full loading skeleton (many divs/svg/placeholders) into
+  // a single clean minimal blockquote.
+  // This guarantees pasting Instagram/X/TikTok/FB full embed HTML into the
+  // article body will never expose the skeleton as visible garbage.
+  const normalized = normalizeSocialEmbedBlockquotes(safe);
+  return normalized;
+}
+
+// Collapse any "instagram-media" / "twitter-tweet" / fb-post / tiktok-embed
+// blockquote with a messy internal skeleton into a clean minimal blockquote.
+// Uses a lightweight DOM-ish walk via a scratch element so we don't depend on
+// DOMParser being available (SSR safe).
+function normalizeSocialEmbedBlockquotes(html: string): string {
+  if (!html) return html;
+  if (typeof document === "undefined") return html;
+
+  try {
+    const scratch = document.createElement("div");
+    scratch.innerHTML = html;
+
+    const classes = ["twitter-tweet", "instagram-media", "fb-post", "tiktok-embed"];
+    const blockquotes = Array.from(
+      scratch.querySelectorAll<HTMLElement>(
+        classes.map((c) => `blockquote.${c}`).join(","),
+      ),
+    );
+
+    for (const bq of blockquotes) {
+      // Extract permalink (data-* attribute, cite, or first contained anchor)
+      let permalink =
+        bq.getAttribute("data-instgrm-permalink") ||
+        bq.getAttribute("data-embed-permalink") ||
+        bq.getAttribute("cite") ||
+        "";
+      if (!permalink) {
+        const firstA = bq.querySelector<HTMLAnchorElement>("a[href]");
+        permalink = firstA?.href || "";
+      }
+      // Normalize: remove leading/trailing backticks (common when copying embed snippets)
+      permalink = permalink.replace(/^`|`$/g, "").trim();
+
+      // Sanitize permalink before writing back
+      let safeLink = permalink;
+      try {
+        const u = new URL(permalink);
+        if (u.protocol !== "http:" && u.protocol !== "https:") safeLink = "";
+      } catch {
+        safeLink = "";
+      }
+
+      // Drop every child div/span/svg/p/etc. (the skeleton + caption fallback paragraphs
+      // that were part of the widget's placeholder HTML). We keep ONLY a single
+      // clean <a href="permalink"> fallback link, matching what insertPostEmbed()
+      // produces in the admin editor.
+      while (bq.firstChild) bq.firstChild.remove();
+
+      const label = (() => {
+        const cls = bq.getAttribute("class") || "";
+        if (cls.includes("instagram-media")) return "View this post on Instagram";
+        if (cls.includes("twitter-tweet")) return "View this post on X / Twitter";
+        if (cls.includes("fb-post")) return "View this post on Facebook";
+        if (cls.includes("tiktok-embed")) return "View this post on TikTok";
+        return "View this post";
+      })();
+
+      if (safeLink) {
+        const a = document.createElement("a");
+        a.href = safeLink;
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        a.textContent = label;
+        bq.appendChild(a);
+      }
+
+      // Ensure data-instgrm-permalink / cite attributes are clean (no backticks)
+      // so the respective widget SDKs still hydrate on the frontend.
+      if (bq.classList.contains("instagram-media") && safeLink) {
+        bq.setAttribute("data-instgrm-captioned", "");
+        bq.setAttribute("data-instgrm-permalink", safeLink);
+        if (!bq.hasAttribute("data-instgrm-version")) bq.setAttribute("data-instgrm-version", "14");
+      }
+      if (bq.classList.contains("tiktok-embed") && safeLink) {
+        bq.setAttribute("cite", safeLink);
+      }
+      if (bq.classList.contains("fb-post") && safeLink) {
+        bq.setAttribute("data-href", safeLink);
+      }
+    }
+
+    return scratch.innerHTML;
+  } catch {
+    return html;
+  }
 }
 
 function escapeHtml(value: string) {
@@ -209,33 +573,52 @@ function EmbeddedPost({ url }: { url: string }) {
 
   useEffect(() => {
     if (!embed || typeof document === "undefined") return;
+    let cancelled = false;
 
     if (embed.type === "instagram") {
-      const existingScript = document.querySelector('script[src="//www.instagram.com/embed.js"], script[src="https://www.instagram.com/embed.js"]') as HTMLScriptElement | null;
+      const process = () => {
+        if (cancelled) return;
+        try {
+          (window as any).instgrm?.Embeds?.process?.();
+        } catch {}
+      };
+
+      const existingScript = document.querySelector('script[src="https://www.instagram.com/embed.js"]') as HTMLScriptElement | null;
       if (existingScript && (window as any).instgrm?.Embeds?.process) {
-        (window as any).instgrm.Embeds.process();
+        setTimeout(process, 0);
         return;
       }
 
       const script = existingScript ?? document.createElement("script");
       script.async = true;
+      script.defer = true;
       script.src = "https://www.instagram.com/embed.js";
-      script.onload = () => (window as any).instgrm?.Embeds?.process?.();
+      script.onload = () => setTimeout(process, 50);
+      script.onerror = () => {};
       if (!existingScript) document.body.appendChild(script);
       return;
     }
 
     if (embed.type === "twitter") {
+      const load = () => {
+        if (cancelled) return;
+        try {
+          (window as any).twttr?.widgets?.load?.();
+        } catch {}
+      };
+
       const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]') as HTMLScriptElement | null;
       if (existingScript && (window as any).twttr?.widgets?.load) {
-        (window as any).twttr.widgets.load();
+        setTimeout(load, 0);
         return;
       }
 
       const script = existingScript ?? document.createElement("script");
       script.async = true;
+      script.defer = true;
       script.src = "https://platform.twitter.com/widgets.js";
-      script.onload = () => (window as any).twttr?.widgets?.load?.();
+      script.onload = () => setTimeout(load, 50);
+      script.onerror = () => {};
       if (!existingScript) document.body.appendChild(script);
       return;
     }
@@ -246,9 +629,15 @@ function EmbeddedPost({ url }: { url: string }) {
 
       const script = document.createElement("script");
       script.async = true;
+      script.defer = true;
       script.src = "https://www.tiktok.com/embed.js";
+      script.onerror = () => {};
       document.body.appendChild(script);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [embed]);
 
   if (!embed) {
@@ -281,6 +670,18 @@ function EmbeddedPost({ url }: { url: string }) {
               View this post on Instagram
             </a>
           </blockquote>
+          <noscript>
+            <iframe
+              src={`https://www.instagram.com/p/${embed.permalink.split("/").filter(Boolean).pop()}/embed/captioned/`}
+              width="100%"
+              height="720"
+              frameBorder="0"
+              scrolling="no"
+              allowTransparency
+              title="Instagram post"
+              className="w-full border-0"
+            />
+          </noscript>
         </div>
       </section>
     );
@@ -290,7 +691,7 @@ function EmbeddedPost({ url }: { url: string }) {
     return (
       <section className="mb-8">
         <div className="overflow-hidden rounded border border-gray-200 bg-white p-3">
-          <blockquote className="twitter-tweet mx-auto">
+          <blockquote className="twitter-tweet mx-auto" data-conversation="none" data-dnt="true">
             <a href={embed.permalink} target="_blank" rel="noreferrer">
               {embed.permalink}
             </a>
@@ -312,7 +713,39 @@ function EmbeddedPost({ url }: { url: string }) {
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
+              loading="lazy"
             />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (embed.type === "facebook") {
+    const fbHref = encodeURIComponent((embed as any).href);
+    return (
+      <section className="mb-8">
+        <div className="overflow-hidden rounded border border-gray-200 bg-white p-3">
+          <iframe
+            src={`https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=500`}
+            width="100%"
+            height="560"
+            style={{ border: "none", overflow: "hidden" }}
+            scrolling="no"
+            frameBorder="0"
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            allowFullScreen
+            title="Facebook post"
+          />
+          <div className="mt-2">
+            <a
+              href={(embed as any).href}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-bold underline text-black break-all"
+            >
+              {(embed as any).href}
+            </a>
           </div>
         </div>
       </section>
@@ -344,12 +777,12 @@ function EmbeddedPost({ url }: { url: string }) {
     <div className="mb-8 border border-gray-200 bg-gray-50 p-4">
       <div className="display mb-2 text-lg font-black uppercase">Embedded Post</div>
       <a
-        href={embed.href}
+        href={(embed as any).href ?? url}
         target="_blank"
         rel="noreferrer"
         className="break-all text-sm font-bold text-black underline"
       >
-        {embed.href}
+        {(embed as any).href ?? url}
       </a>
     </div>
   );
@@ -357,47 +790,67 @@ function EmbeddedPost({ url }: { url: string }) {
 
 function getEmbedConfig(url: string) {
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(url.trim());
     const host = parsed.hostname.replace(/^www\./, "");
 
-    if (host === "twitter.com" || host === "x.com") {
+    if (host === "twitter.com" || host === "x.com" || host === "mobile.twitter.com" || host === "m.x.com") {
+      const cleanPath = parsed.pathname.replace(/\/+$/, "") || "/";
       return {
         type: "twitter" as const,
-        permalink: `https://x.com${parsed.pathname}`,
+        permalink: `https://x.com${cleanPath}`,
       };
     }
 
-    if (host === "instagram.com") {
-      const cleanPath = parsed.pathname.endsWith("/") ? parsed.pathname : `${parsed.pathname}/`;
-      if (cleanPath.startsWith("/p/") || cleanPath.startsWith("/reel/") || cleanPath.startsWith("/tv/")) {
+    if (host === "instagram.com" || host === "m.instagram.com" || host === "instagr.am") {
+      const pathOnly = parsed.pathname.replace(/\/+$/, "") + "/";
+      if (pathOnly.startsWith("/p/") || pathOnly.startsWith("/reel/") || pathOnly.startsWith("/tv/") || pathOnly.startsWith("/stories/")) {
         return {
           type: "instagram" as const,
-          permalink: `https://www.instagram.com${cleanPath}`,
+          permalink: `https://www.instagram.com${pathOnly}`,
         };
       }
+      return {
+        type: "link" as const,
+        href: parsed.toString(),
+      };
     }
 
-    if (host === "youtube.com" || host === "m.youtube.com" || host === "youtu.be") {
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "youtu.be" || host === "youtube-nocookie.com" || host === "music.youtube.com") {
       const videoId = getYouTubeVideoId(parsed);
       if (videoId) {
         return {
           type: "youtube" as const,
-          src: `https://www.youtube.com/embed/${videoId}`,
+          src: `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`,
         };
       }
     }
 
     if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
-      const videoId = getTikTokVideoId(parsed.pathname);
-      if (videoId) {
+      const directId = getTikTokVideoId(parsed.pathname);
+      if (directId) {
         return {
           type: "tiktok" as const,
-          permalink: `https://www.tiktok.com${parsed.pathname}`,
-          videoId,
+          permalink: `https://www.tiktok.com${parsed.pathname.replace(/\/+$/, "")}`,
+          videoId: directId,
+        };
+      }
+      const shortMatch = parsed.pathname.match(/^\/v\/(\d+)/);
+      if (shortMatch) {
+        return {
+          type: "tiktok" as const,
+          permalink: `https://www.tiktok.com/v/${shortMatch[1]}`,
+          videoId: shortMatch[1],
         };
       }
       return {
         type: "link" as const,
+        href: parsed.toString(),
+      };
+    }
+
+    if (host === "facebook.com" || host.endsWith(".facebook.com") || host === "fb.watch" || host === "fb.com") {
+      return {
+        type: "facebook" as const,
         href: parsed.toString(),
       };
     }
@@ -433,6 +886,8 @@ function getYouTubeVideoId(parsed: URL) {
 }
 
 function getTikTokVideoId(pathname: string) {
-  const match = pathname.match(/\/video\/(\d+)/);
-  return match?.[1] ?? null;
+  const direct = pathname.match(/\/video\/(\d+)/);
+  if (direct?.[1]) return direct[1];
+  const short = pathname.match(/\/v\/(\d+)/);
+  return short?.[1] ?? null;
 }

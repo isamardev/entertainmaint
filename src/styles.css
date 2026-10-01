@@ -101,6 +101,19 @@
   a:hover {
     color: var(--color-primary);
   }
+  .prose a,
+  .prose a:where(:not(.prose-custom-links)) {
+    color: inherit;
+  }
+  .prose a {
+    color: rgb(29 78 216); /* blue-700 */
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .prose a:hover {
+    text-decoration: underline;
+    color: rgb(30 64 175); /* blue-800 */
+  }
 }
 
 @utility yellow-bar {
@@ -111,21 +124,33 @@
 
 
 @utility trending-track {
-  animation: trending-scroll 50s linear infinite;
+  /* Static trending — animation intentionally disabled (was marquee scroll). */
+  transform: translateX(0);
 }
 
-.trending-track:hover {
-  animation-play-state: paused;
+/* Trending Now horizontal manual scrollbar — ALWAYS visible so users can drag
+   left / right (WebKit / Chromium / Safari + Firefox fallbacks). Track matches
+   bar background, thumb uses the site yellow accent for visibility. */
+.trending-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-yellow) oklch(0.97 0.005 260);
+}
+.trending-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.trending-scroll::-webkit-scrollbar-track {
+  background: oklch(0.97 0.005 260);
+  border-radius: 9999px;
+}
+.trending-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-yellow);
+  border-radius: 9999px;
+  border: 1px solid oklch(0.92 0.005 260);
+}
+.trending-scroll::-webkit-scrollbar-thumb:hover {
+  filter: brightness(1.05);
 }
 
-@keyframes trending-scroll {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
 
 @utility ticker-track {
   animation: ticker 40s linear infinite;
@@ -137,5 +162,28 @@
   }
   100% {
     transform: translateX(-50%);
+  }
+}
+
+@layer base {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 3rem;
+    padding-right: 3rem;
+    max-width: 80rem;
+  }
+  @media (min-width: 768px) {
+    .container {
+      padding-left: 5rem;
+      padding-right: 5rem;
+    }
+  }
+  @media (min-width: 1280px) {
+    .container {
+      padding-left: 7rem;
+      padding-right: 7rem;
+    }
   }
 }

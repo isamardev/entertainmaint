@@ -27,3 +27,12 @@ export function fullDate(iso: string | null | undefined): string {
     minute: "2-digit",
   });
 }
+
+export function shortDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}

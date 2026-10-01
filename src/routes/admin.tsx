@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
 
 // Client-only admin gate. RLS is still the source of truth on the server.
 export const Route = createFileRoute("/admin")({
@@ -15,11 +16,18 @@ function AdminLayout() {
   const navigate = useNavigate();
   useEffect(() => {
     if (loading) return;
-    if (!user) navigate({ to: "/auth", replace: true });
-    else if (!isAdmin) navigate({ to: "/", replace: true });
+    if (user && !isAdmin) navigate({ to: "/", replace: true });
   }, [user, loading, isAdmin, navigate]);
 
-  if (loading || !user || !isAdmin) {
+  if (loading) {
+    return <div className="p-16 text-center text-black">Checking access…</div>;
+  }
+
+  if (!user) {
+    return <AdminLoginForm redirectTo="/admin" showBackLink={false} />;
+  }
+
+  if (!isAdmin) {
     return <div className="p-16 text-center text-black">Checking access…</div>;
   }
 

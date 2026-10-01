@@ -1,16 +1,14 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Menu, Search, User as UserIcon, X } from "lucide-react";
+import { Menu, Search, X } from "lucide-react";
 import { categoryService } from "@/services/articleService";
-import { useAuth } from "@/context/AuthContext";
 
 export function Navbar() {
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: categoryService.list,
   });
-  const { user, isAdmin, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [q, setQ] = useState("");
@@ -25,7 +23,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-0">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
         <button className="md:hidden" onClick={() => setOpen((v) => !v)} aria-label="Menu">
           {open ? <X size={22} /> : <Menu size={22} />}
@@ -50,37 +48,27 @@ export function Navbar() {
               {c.name}
             </Link>
           ))}
+          <div className="mx-2 h-5 w-px bg-border/70" aria-hidden="true" />
+          <Link
+            to="/contact"
+            className="display px-3 py-2 text-sm font-bold uppercase tracking-wider text-foreground/80 transition-colors hover:text-black"
+            activeProps={{ className: "text-black" }}
+          >
+            Contact Us
+          </Link>
+          <Link
+            to="/privacy-policy"
+            className="display px-3 py-2 text-sm font-bold uppercase tracking-wider text-foreground/80 transition-colors hover:text-black"
+            activeProps={{ className: "text-black" }}
+          >
+            Privacy Policy
+          </Link>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => setSearching((v) => !v)} aria-label="Search" className="p-2 hover:text-black">
             <Search size={20} />
           </button>
-          {user ? (
-            <div className="flex items-center gap-2">
-              {isAdmin && (
-                <Link
-                  to="/admin"
-                  className="hidden rounded border border-black px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-black hover:bg-black hover:text-white sm:inline-block"
-                >
-                  Admin
-                </Link>
-              )}
-              <button onClick={signOut} className="hidden text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-black sm:inline-block">
-                Sign out
-              </button>
-              <div className="grid h-8 w-8 place-items-center rounded-full bg-surface-2">
-                <UserIcon size={16} />
-              </div>
-            </div>
-          ) : (
-            <Link
-              to="/auth"
-              className="rounded border border-border px-3 py-1.5 text-xs font-bold uppercase tracking-widest hover:border-black hover:text-black"
-            >
-              Sign in
-            </Link>
-          )}
         </div>
       </div>
 
@@ -118,15 +106,20 @@ export function Navbar() {
                 {c.name}
               </Link>
             ))}
-            {isAdmin && (
-              <Link
-                to="/admin"
-                onClick={() => setOpen(false)}
-                className="display py-2 text-sm font-bold uppercase tracking-wider text-black"
-              >
-                Admin Dashboard
-              </Link>
-            )}
+            <Link
+              to="/contact"
+              onClick={() => setOpen(false)}
+              className="display border-b border-border py-2 text-sm font-bold uppercase tracking-wider"
+            >
+              Contact Us
+            </Link>
+            <Link
+              to="/privacy-policy"
+              onClick={() => setOpen(false)}
+              className="display border-b border-border py-2 text-sm font-bold uppercase tracking-wider"
+            >
+              Privacy Policy
+            </Link>
           </nav>
         </div>
       )}

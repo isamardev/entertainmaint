@@ -28,6 +28,8 @@ export function AdminSidebar({ open = false, onClose }: Props) {
   const isArchivedActive = path === "/admin" && status === "archived";
   const isNewArticleActive = path === "/admin/new";
   const isCategoriesActive = path.startsWith("/admin/categories");
+  const isSettingsActive = path.startsWith("/admin/settings");
+  const isSocialsActive = path.startsWith("/admin/socials");
 
   useEffect(() => {
     onClose?.();
@@ -78,11 +80,17 @@ export function AdminSidebar({ open = false, onClose }: Props) {
         </Link>
         {isSuperAdmin && (
           <Link to="/admin/categories" className={linkClass(isCategoriesActive)}>
-            Mange Categories
+            Manage Categories
           </Link>
         )}
       </nav>
       <div className="border-t border-gray-200 p-4">
+        <Link to="/admin/settings" className={`mb-2 block ${linkClass(isSettingsActive)}`}>
+          Account Settings
+        </Link>
+        <Link to="/admin/socials" className={`mb-2 block ${linkClass(isSocialsActive)}`}>
+          Social Media Links
+        </Link>
         <Link
           to="/"
           className={`mb-2 block rounded px-4 py-2 font-bold uppercase tracking-wide text-sm transition-colors ${inactiveClass}`}

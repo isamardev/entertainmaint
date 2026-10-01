@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("./load-env.cjs");
 const db = require("./models/index.cjs");
 
 const testConnection = async () => {

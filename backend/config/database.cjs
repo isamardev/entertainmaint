@@ -1,8 +1,10 @@
-require("dotenv").config();
+require("../load-env.cjs");
 const { Sequelize } = require("sequelize");
 
 const databaseUrl = process.env.DATABASE_URL;
-const dialect = process.env.DB_DIALECT || (databaseUrl ? "postgres" : "mysql");
+const explicitDialect = process.env.DB_DIALECT;
+const useDatabaseUrl = Boolean(databaseUrl) && explicitDialect !== "mysql";
+const dialect = explicitDialect || (useDatabaseUrl ? "postgres" : "mysql");
 const isPostgres = dialect === "postgres";
 
 const commonOptions = {
@@ -23,10 +25,10 @@ const commonOptions = {
       }),
 };
 
-const sequelize = databaseUrl
+const sequelize = useDatabaseUrl
   ? new Sequelize(databaseUrl, commonOptions)
   : new Sequelize(
-      process.env.DB_NAME || "entertainmaint",
+      process.env.DB_NAME || "entertainment",
       process.env.DB_USER || "root",
       process.env.DB_PASSWORD || "",
       commonOptions,

@@ -74,3 +74,4 @@ function SearchPage() {
     </div>
   );
 }
+
