@@ -1,1 +1,0 @@
-function e(e){return e?new Date(e).toLocaleString(void 0,{weekday:`short`,month:`short`,day:`numeric`,year:`numeric`,hour:`numeric`,minute:`2-digit`}):``}function t(e){return e?new Date(e).toLocaleDateString(void 0,{month:`short`,day:`numeric`,year:`numeric`}):``}export{t as n,e as t};

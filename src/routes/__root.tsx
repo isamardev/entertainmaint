@@ -96,6 +96,9 @@ function RootComponent() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
   const isArticlePage = location.pathname.startsWith("/article/");
+  const showTrending = isArticlePage;
+  const { direction, atTop } = useScrollDirection(10);
+  const headerWrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -122,10 +125,6 @@ function RootComponent() {
     );
   }
 
-  const showTrending = isArticlePage;
-  const { direction, atTop } = useScrollDirection(10);
-  const headerWrapRef = useRef<HTMLDivElement | null>(null);
-
   // Hide rule: only when user scrolls DOWN, AND they have scrolled PAST the header (not
   // still near the top). Otherwise the header is always visible (up-scroll or top-of-page).
   const hideHeader = direction === "down" && !atTop;
@@ -148,7 +147,12 @@ function RootComponent() {
               <Navbar />
               {/* Mobile (screen < md = <768px): hide yellow stripe + TrendingBar entirely.
                   md+ (tablet / desktop): render them normally with the sticky header. */}
-              {showTrending && <div className="hidden h-3 w-full bg-[var(--color-yellow)] border-0 md:block" role="presentation" />}
+              {showTrending && (
+                <div
+                  className="hidden h-3 w-full bg-[var(--color-yellow)] border-0 md:block"
+                  role="presentation"
+                />
+              )}
               {showTrending && (
                 <div className="hidden md:block">
                   <TrendingBar />

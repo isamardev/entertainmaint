@@ -66,7 +66,11 @@ export function Navbar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => setSearching((v) => !v)} aria-label="Search" className="p-2 hover:text-black">
+          <button
+            onClick={() => setSearching((v) => !v)}
+            aria-label="Search"
+            className="p-2 hover:text-black"
+          >
             <Search size={20} />
           </button>
         </div>
@@ -83,9 +87,7 @@ export function Navbar() {
               placeholder="Search Entertainment Trends…"
               className="flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
             />
-            <button
-              className="yellow-bar px-4 py-1.5 text-sm font-bold uppercase tracking-wider"
-            >
+            <button className="yellow-bar px-4 py-1.5 text-sm font-bold uppercase tracking-wider">
               Go
             </button>
           </div>

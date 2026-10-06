@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-runtime-B6jttwkn.js";import{t}from"./AdminLoginForm-CJKKwTf8.js";var n=e();function r(){return(0,n.jsx)(t,{redirectTo:`/admin`,showBackLink:!0})}export{r as component};

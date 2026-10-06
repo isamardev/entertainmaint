@@ -3,10 +3,7 @@ import { SocialLinksForm } from "@/components/admin/SocialLinksForm";
 
 export const Route = createFileRoute("/admin/socials")({
   head: () => ({
-    meta: [
-      { title: "Social Media Links — Admin" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Social Media Links — Admin" }, { name: "robots", content: "noindex" }],
   }),
   component: AdminSocials,
 });

@@ -28,37 +28,55 @@ function ContactPage() {
           <section className="mb-8">
             <h2 className="display mb-3 text-2xl font-black uppercase">General Enquiries</h2>
             <p className="text-muted-foreground">
-              For general questions, corrections, or feedback about a story, email our editors at
-              {" "}<a className="text-black underline underline-offset-2 hover:text-yellow" href="mailto:editorial@entertainmenttrends.example">editorial@entertainmenttrends.example</a>.
-              We endeavour to respond within 2–3 business days.
+              For general questions, corrections, or feedback about a story, email our editors at{" "}
+              <a
+                className="text-black underline underline-offset-2 hover:text-yellow"
+                href="mailto:editorial@entertainmenttrends.example"
+              >
+                editorial@entertainmenttrends.example
+              </a>
+              . We endeavour to respond within 2–3 business days.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="display mb-3 text-2xl font-black uppercase">Story Tips</h2>
             <p className="text-muted-foreground">
-              Got a lead or a tip worth covering? Send it to
-              {" "}<a className="text-black underline underline-offset-2 hover:text-yellow" href="mailto:tips@entertainmenttrends.example">tips@entertainmenttrends.example</a>.
-              We treat anonymous submissions with the highest level of confidentiality.
+              Got a lead or a tip worth covering? Send it to{" "}
+              <a
+                className="text-black underline underline-offset-2 hover:text-yellow"
+                href="mailto:tips@entertainmenttrends.example"
+              >
+                tips@entertainmenttrends.example
+              </a>
+              . We treat anonymous submissions with the highest level of confidentiality.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="display mb-3 text-2xl font-black uppercase">Press & Partnerships</h2>
             <p className="text-muted-foreground">
-              For brand partnerships, affiliate enquiries, press access, or advertising opportunities,
-              please write to
-              {" "}<a className="text-black underline underline-offset-2 hover:text-yellow" href="mailto:partners@entertainmenttrends.example">partners@entertainmenttrends.example</a>
-              {" "}and a member of our commercial team will get back to you within one business day.
+              For brand partnerships, affiliate enquiries, press access, or advertising
+              opportunities, please write to{" "}
+              <a
+                className="text-black underline underline-offset-2 hover:text-yellow"
+                href="mailto:partners@entertainmenttrends.example"
+              >
+                partners@entertainmenttrends.example
+              </a>{" "}
+              and a member of our commercial team will get back to you within one business day.
             </p>
           </section>
 
           <section className="mb-2">
             <h2 className="display mb-3 text-2xl font-black uppercase">Mail</h2>
             <address className="not-italic text-muted-foreground">
-              Entertainment Trends Ltd.<br />
-              221B Fleet Street<br />
-              London, EC4A 2DY<br />
+              Entertainment Trends Ltd.
+              <br />
+              221B Fleet Street
+              <br />
+              London, EC4A 2DY
+              <br />
               United Kingdom
             </address>
           </section>

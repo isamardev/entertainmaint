@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import type { Article } from "@/services/articleService";
+import { normalizeMediaUrl, type Article } from "@/services/articleService";
 
 type Props = {
   article: Article;
@@ -96,7 +96,8 @@ export function ArticleMedia({
   const hd = imageOverride ?? article.hero_image_hd ?? article.hero_image_lq ?? "";
   const lq = imageOverride ?? article.hero_image_lq ?? hd;
   const preview = getEmbedPreview(article.embed_url);
-  const imageSrc = hd || preview?.image || "";
+  const rawImageSrc = hd || preview?.image || "";
+  const imageSrc = normalizeMediaUrl(rawImageSrc);
 
   return (
     <div className={className}>
@@ -115,9 +116,7 @@ export function ArticleMedia({
           <span className="text-xs font-black uppercase tracking-[0.25em]">{preview.label}</span>
           <div>
             <p className="text-lg font-black leading-tight">Open Story</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {preview.host || "Embedded post"}
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{preview.host || "Embedded post"}</p>
           </div>
         </div>
       ) : null}

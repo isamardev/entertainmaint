@@ -62,14 +62,7 @@ function extractJsonError(payload: unknown): string | null {
   }
   if (typeof payload === "object") {
     const p = payload as Record<string, unknown>;
-    const candidates = [
-      p.error,
-      p.message,
-      p.errorMessage,
-      p.detail,
-      p.msg,
-      p.reason,
-    ] as unknown[];
+    const candidates = [p.error, p.message, p.errorMessage, p.detail, p.msg, p.reason] as unknown[];
     for (const c of candidates) {
       if (typeof c === "string" && c.trim()) {
         const s = c.trim().replace(/[<>]/g, "");
@@ -146,15 +139,15 @@ export async function safeFetchJson<T = unknown>(
       err instanceof Error && err.message && !/<|DOCTYPE/i.test(err.message)
         ? ` (${err.message})`
         : "";
-    const message = stackMsg && !/CORS|Failed to fetch/i.test(baseMessage + stackMsg)
-      ? baseMessage
-      : baseMessage;
+    const message =
+      stackMsg && !/CORS|Failed to fetch/i.test(baseMessage + stackMsg) ? baseMessage : baseMessage;
     return {
       ok: false,
       status: 0,
       statusText: "Network Error",
       headers: new Headers(),
-      error: message + (stackMsg && message === baseMessage && !/<|DOCTYPE/.test(stackMsg) ? "" : ""),
+      error:
+        message + (stackMsg && message === baseMessage && !/<|DOCTYPE/.test(stackMsg) ? "" : ""),
       contentType: null,
     };
   }

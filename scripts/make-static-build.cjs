@@ -28,8 +28,7 @@ copyDir(publicDir, outDir);
 
 const assetFiles = fs.readdirSync(path.join(outDir, "assets"));
 const entryJs =
-  assetFiles.find((f) => /^index-.*\.js$/i.test(f)) ||
-  assetFiles.find((f) => /\.js$/i.test(f));
+  assetFiles.find((f) => /^index-.*\.js$/i.test(f)) || assetFiles.find((f) => /\.js$/i.test(f));
 
 if (!entryJs) {
   console.error("Could not find JS entry in build/assets");
@@ -37,9 +36,7 @@ if (!entryJs) {
 }
 
 const cssFiles = assetFiles.filter((f) => /\.css$/i.test(f));
-const cssLinks = cssFiles
-  .map((f) => `    <link rel="stylesheet" href="./assets/${f}">`)
-  .join("\n");
+const cssLinks = cssFiles.map((f) => `    <link rel="stylesheet" href="./assets/${f}">`).join("\n");
 
 const html = `<!doctype html>
 <html lang="en">

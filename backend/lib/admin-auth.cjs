@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 
 const PBKDF2_ITERATIONS = 120_000;
-const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const TOKEN_TTL_MS = Number(process.env.ADMIN_TOKEN_TTL_MS) || 20 * 60 * 1000;
 
 function getJwtSecret() {
   const secret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET;
@@ -18,7 +18,9 @@ function normalizeEmail(email = "") {
 }
 
 function hashPassword(password, saltBuffer) {
-  return crypto.pbkdf2Sync(password, saltBuffer, PBKDF2_ITERATIONS, 32, "sha256").toString("base64");
+  return crypto
+    .pbkdf2Sync(password, saltBuffer, PBKDF2_ITERATIONS, 32, "sha256")
+    .toString("base64");
 }
 
 function createPasswordRecord(password) {

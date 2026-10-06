@@ -1,1 +1,0 @@
-import{n as e}from"./rolldown-runtime-Bh1tDfsg.js";import{t}from"./react-CES6V0Ih.js";import{S as n}from"./index-BSPZPbc_.js";var r=e(t());function i(){let e=n();return(0,r.useEffect)(()=>{e({to:`/admin/login`,replace:!0})},[e]),null}export{i as component};

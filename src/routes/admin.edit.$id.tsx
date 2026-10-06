@@ -18,7 +18,10 @@ function EditArticle() {
       try {
         return await articleService.listAll().then((all) => {
           const found = all.find((a) => a.id === numericId);
-          if (!found) throw new Error(`The requested article (ID ${numericId}) does not exist or has been deleted.`);
+          if (!found)
+            throw new Error(
+              `The requested article (ID ${numericId}) does not exist or has been deleted.`,
+            );
           return found;
         });
       } catch (err) {

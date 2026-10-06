@@ -19,10 +19,11 @@ export function AdminSidebar({ open = false, onClose }: Props) {
   const rawSearch = (location as any).search;
   const status =
     typeof rawSearch === "string"
-      ? new URLSearchParams(rawSearch).get("status") ?? "all"
-      : (rawSearch?.status as string | undefined) ?? "all";
+      ? (new URLSearchParams(rawSearch).get("status") ?? "all")
+      : ((rawSearch?.status as string | undefined) ?? "all");
 
-  const isAllArticlesActive = (path === "/admin" && status === "all") || path.startsWith("/admin/edit");
+  const isAllArticlesActive =
+    (path === "/admin" && status === "all") || path.startsWith("/admin/edit");
   const isPublishedActive = path === "/admin" && status === "published";
   const isDraftActive = path === "/admin" && status === "draft";
   const isArchivedActive = path === "/admin" && status === "archived";

@@ -98,7 +98,9 @@ async function parseAdminJsonAuthenticated<T>(
       throw new Error("You do not have permission to perform this action.");
     }
     if (status === 404) {
-      throw new Error("The requested page or action is currently unavailable. Please try again later.");
+      throw new Error(
+        "The requested page or action is currently unavailable. Please try again later.",
+      );
     }
     throw new Error("Something went wrong. Please try again later.");
   }
@@ -107,7 +109,9 @@ async function parseAdminJsonAuthenticated<T>(
     /<html[\s>]/i.test(trimmed.slice(0, 512));
   if (looksHtml) {
     if (status === 404) {
-      throw new Error("The requested page or action is currently unavailable. Please try again later.");
+      throw new Error(
+        "The requested page or action is currently unavailable. Please try again later.",
+      );
     }
     throw new Error("Something went wrong. Please try again later.");
   }
@@ -129,9 +133,7 @@ async function parseAdminJsonAuthenticated<T>(
   const payload = parsed as any;
   if (!(status >= 200 && status < 300)) {
     const errMsg =
-      payload && typeof payload === "object"
-        ? payload.error || payload.message
-        : undefined;
+      payload && typeof payload === "object" ? payload.error || payload.message : undefined;
     if (typeof errMsg === "string" && errMsg.trim()) {
       throw new Error(errMsg.trim().replace(/[<>]/g, ""));
     }

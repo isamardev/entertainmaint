@@ -10,7 +10,9 @@ import {
 
 export function SocialLinksForm() {
   const [socials, setSocials] = useState<SocialLinks>(() => ({ ...EMPTY_SOCIAL_LINKS }));
-  const [socialsInitial, setSocialsInitial] = useState<SocialLinks>(() => ({ ...EMPTY_SOCIAL_LINKS }));
+  const [socialsInitial, setSocialsInitial] = useState<SocialLinks>(() => ({
+    ...EMPTY_SOCIAL_LINKS,
+  }));
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,9 +85,7 @@ export function SocialLinksForm() {
         onSubmit={handleSave}
         className="space-y-5 border border-gray-200 bg-gray-50 p-5 md:p-6"
       >
-        {loading && (
-          <div className="text-sm text-gray-500">Loading current social links…</div>
-        )}
+        {loading && <div className="text-sm text-gray-500">Loading current social links…</div>}
         {error && !loading && (
           <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
             {error}
@@ -96,18 +96,18 @@ export function SocialLinksForm() {
           {socialLinkLabels.map((field) => (
             <label key={field.key} className="flex flex-col gap-1">
               <span className="text-xs font-black uppercase tracking-widest text-black">
-              {field.label}
-            </span>
-            <input
-              type="text"
-              value={socials[field.key]}
-              onChange={(e) => setSocials((s) => ({ ...s, [field.key]: e.target.value }))}
-              placeholder={placeholderFor[field.key]}
-              className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
-              disabled={loading}
-              autoComplete="off"
-            />
-          </label>
+                {field.label}
+              </span>
+              <input
+                type="text"
+                value={socials[field.key]}
+                onChange={(e) => setSocials((s) => ({ ...s, [field.key]: e.target.value }))}
+                placeholder={placeholderFor[field.key]}
+                className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
+                disabled={loading}
+                autoComplete="off"
+              />
+            </label>
           ))}
         </div>
 

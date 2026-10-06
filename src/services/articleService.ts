@@ -1,6 +1,7 @@
 // Client-side article/category service using Node.js backend
 import { getApiUrl } from "@/lib/api";
 import { safeFetchJson } from "@/lib/safe-fetch";
+import { SEED_ARTICLES, SEED_CATEGORIES } from "./seedData";
 
 export type Category = {
   id: number;
@@ -33,6 +34,37 @@ export type Article = {
   category?: Category | null;
 };
 
+export function normalizeMediaUrl(url?: string | null): string {
+  if (!url || typeof url !== "string") return "";
+  // Route Hostinger uploads through same-origin /api/uploads/ to prevent browser 403 CORS blocks
+  return url.replace(
+    /^https?:\/\/aliceblue-goose-490382\.hostingersite\.com\/api\/uploads\//i,
+    "/api/uploads/",
+  );
+}
+
+export function normalizeArticleMedia(a: Article): Article {
+  if (!a) return a;
+  const hd = a.hero_image_hd ? normalizeMediaUrl(a.hero_image_hd) : null;
+  const lq = a.hero_image_lq ? normalizeMediaUrl(a.hero_image_lq) : null;
+  let body = a.body;
+  if (
+    typeof body === "string" &&
+    body.includes("aliceblue-goose-490382.hostingersite.com/api/uploads/")
+  ) {
+    body = body.replace(
+      /https?:\/\/aliceblue-goose-490382\.hostingersite\.com\/api\/uploads\//gi,
+      "/api/uploads/",
+    );
+  }
+  return {
+    ...a,
+    hero_image_hd: hd,
+    hero_image_lq: lq,
+    body: body ?? "",
+  };
+}
+
 export const articleService = {
   async listPublished(opts: { limit?: number; offset?: number; categorySlug?: string } = {}) {
     try {
@@ -40,52 +72,69 @@ export const articleService = {
       if (opts.limit) params.set("limit", opts.limit.toString());
       if (opts.offset) params.set("offset", opts.offset.toString());
 
-      const result = await safeFetchJson<Article[]>(
-        getApiUrl(`/articles/published?${params}`),
-      );
-      if (!result.ok) {
-        return { data: [] as Article[], count: 0 };
+      const result = await safeFetchJson<Article[]>(getApiUrl(`/articles/published?${params}`));
+      let data =
+        result.ok && Array.isArray(result.data) && result.data.length > 0
+          ? result.data.map(normalizeArticleMedia)
+          : SEED_ARTICLES;
+
+      if (opts.categorySlug) {
+        data = data.filter((a) => a.category?.slug === opts.categorySlug);
       }
-      let data = Array.isArray(result.data) ? result.data : [];
+      if (opts.limit) {
+        const offset = opts.offset || 0;
+        data = data.slice(offset, offset + opts.limit);
+      }
+      return { data, count: data.length };
+    } catch {
+      let data = SEED_ARTICLES;
       if (opts.categorySlug) {
         data = data.filter((a) => a.category?.slug === opts.categorySlug);
       }
       return { data, count: data.length };
-    } catch {
-      return { data: [] as Article[], count: 0 };
     }
   },
 
   async getBySlug(slug: string): Promise<Article | null> {
     try {
       const result = await safeFetchJson<Article>(getApiUrl(`/articles/slug/${slug}`));
-      return result.ok ? result.data : null;
+      if (result.ok && result.data) return normalizeArticleMedia(result.data);
+      return SEED_ARTICLES.find((a) => a.slug === slug) ?? null;
     } catch {
-      return null;
+      return SEED_ARTICLES.find((a) => a.slug === slug) ?? null;
     }
   },
 
   async listBreaking(): Promise<Article[]> {
     try {
       const result = await safeFetchJson<Article[]>(getApiUrl("/articles/published"));
-      if (!result.ok) return [];
-      return (Array.isArray(result.data) ? result.data : []).filter((a) => a.is_breaking).slice(0, 6);
+      const list =
+        result.ok && Array.isArray(result.data) && result.data.length > 0
+          ? result.data.map(normalizeArticleMedia)
+          : SEED_ARTICLES;
+      return list.filter((a) => a.is_breaking).slice(0, 6);
     } catch {
-      return [];
+      return SEED_ARTICLES.filter((a) => a.is_breaking).slice(0, 6);
     }
   },
 
   async listTrending(limit = 6): Promise<Article[]> {
     try {
       const result = await safeFetchJson<Article[]>(getApiUrl("/articles/published"));
-      if (!result.ok) return [];
-      const data = Array.isArray(result.data) ? result.data : [];
+      const list =
+        result.ok && Array.isArray(result.data) && result.data.length > 0
+          ? result.data.map(normalizeArticleMedia)
+          : SEED_ARTICLES;
       const seenSlugs = new Set<string>();
-      return data
+      return list
         .slice()
         .sort((a, b) => {
-          const aTime = a.published_at ? new Date(a.published_at).getTime() : new Date(a.created_at).getTime();
-          const bTime = b.published_at ? new Date(b.published_at).getTime() : new Date(b.created_at).getTime();
+          const aTime = a.published_at
+            ? new Date(a.published_at).getTime()
+            : new Date(a.created_at).getTime();
+          const bTime = b.published_at
+            ? new Date(b.published_at).getTime()
+            : new Date(b.created_at).getTime();
           if (bTime !== aTime) return bTime - aTime;
           return (b.view_count ?? 0) - (a.view_count ?? 0);
         })
@@ -97,7 +146,7 @@ export const articleService = {
         })
         .slice(0, limit);
     } catch {
-      return [];
+      return SEED_ARTICLES.slice(0, limit);
     }
   },
 
@@ -106,13 +155,18 @@ export const articleService = {
       const term = q.trim().toLowerCase();
       if (!term) return [];
       const result = await safeFetchJson<Article[]>(getApiUrl("/articles/published"));
-      if (!result.ok) return [];
-      const data = Array.isArray(result.data) ? result.data : [];
+      const data =
+        result.ok && Array.isArray(result.data) && result.data.length > 0
+          ? result.data.map(normalizeArticleMedia)
+          : SEED_ARTICLES;
       return data.filter(
         (a) => a.title.toLowerCase().includes(term) || a.dek?.toLowerCase().includes(term),
       );
     } catch {
-      return [];
+      const term = q.trim().toLowerCase();
+      return SEED_ARTICLES.filter(
+        (a) => a.title.toLowerCase().includes(term) || a.dek?.toLowerCase().includes(term),
+      );
     }
   },
 
@@ -120,13 +174,17 @@ export const articleService = {
     try {
       if (!article.category_id) return [];
       const result = await safeFetchJson<Article[]>(getApiUrl("/articles/published"));
-      if (!result.ok) return [];
-      const data = Array.isArray(result.data) ? result.data : [];
+      const data =
+        result.ok && Array.isArray(result.data) && result.data.length > 0
+          ? result.data.map(normalizeArticleMedia)
+          : SEED_ARTICLES;
       return data
         .filter((a) => a.category_id === article.category_id && a.id !== article.id)
         .slice(0, limit);
     } catch {
-      return [];
+      return SEED_ARTICLES.filter(
+        (a) => a.category_id === article.category_id && a.id !== article.id,
+      ).slice(0, limit);
     }
   },
 
@@ -134,13 +192,27 @@ export const articleService = {
   async listAll(): Promise<Article[]> {
     const result = await safeFetchJson<Article[]>(getApiUrl("/articles?includeCategory=true"));
     if (!result.ok) throw new Error(result.error);
-    return Array.isArray(result.data) ? result.data : [];
+    const list = Array.isArray(result.data) ? result.data : [];
+    return list.map(normalizeArticleMedia);
   },
   async create(input: Partial<Article>) {
+    if (!input.title || !input.title.trim()) {
+      throw new Error("Article title is required.");
+    }
+    if (!input.dek || !input.dek.trim()) {
+      throw new Error("Article description (dek) is required.");
+    }
+    if (!input.category_id) {
+      throw new Error("Article category is required.");
+    }
+    if (!input.hero_image_hd?.trim() && !input.hero_image_lq?.trim()) {
+      throw new Error("Article hero image is required.");
+    }
+
     const payload = {
-      title: input.title || "",
+      title: input.title.trim(),
       slug: input.slug || "",
-      dek: input.dek || null,
+      dek: input.dek.trim(),
       body: input.body || "",
       category_id: input.category_id || null,
       author_id: input.author_id || null,
@@ -163,6 +235,20 @@ export const articleService = {
     return result.data;
   },
   async update(id: number, input: Partial<Article>) {
+    if (input.title !== undefined && !input.title.trim()) {
+      throw new Error("Article title cannot be empty.");
+    }
+    if (input.dek !== undefined && !input.dek.trim()) {
+      throw new Error("Article description (dek) cannot be empty.");
+    }
+    if (
+      (input.hero_image_hd !== undefined || input.hero_image_lq !== undefined) &&
+      !input.hero_image_hd?.trim() &&
+      !input.hero_image_lq?.trim()
+    ) {
+      throw new Error("Article hero image cannot be empty.");
+    }
+
     const payload = { ...input };
     delete payload.created_at;
     delete payload.updated_at;
@@ -190,10 +276,12 @@ export const categoryService = {
       const result = await safeFetchJson<Category[]>(getApiUrl("/categories"), {
         cache: "no-store" as RequestCache,
       });
-      if (!result.ok) return [];
-      return Array.isArray(result.data) ? result.data : [];
+      if (result.ok && Array.isArray(result.data) && result.data.length > 0) {
+        return result.data;
+      }
+      return SEED_CATEGORIES;
     } catch {
-      return [];
+      return SEED_CATEGORIES;
     }
   },
   async create(input: Partial<Category>) {

@@ -15,7 +15,9 @@ export const Route = createFileRoute("/article/$slug")({
   },
   head: ({ loaderData, params }) => {
     if (!loaderData)
-      return { meta: [{ title: "Article — Entertainment Trends" }, { name: "robots", content: "noindex" }] };
+      return {
+        meta: [{ title: "Article — Entertainment Trends" }, { name: "robots", content: "noindex" }],
+      };
     const a = loaderData.article;
     const img = a.hero_image_hd ?? a.hero_image_lq;
     return {
@@ -26,7 +28,12 @@ export const Route = createFileRoute("/article/$slug")({
         { property: "og:description", content: a.dek ?? "" },
         { property: "og:type", content: "article" },
         { property: "og:url", content: `/article/${params.slug}` },
-        ...(img ? [{ property: "og:image", content: img }, { name: "twitter:image", content: img }] : []),
+        ...(img
+          ? [
+              { property: "og:image", content: img },
+              { name: "twitter:image", content: img },
+            ]
+          : []),
       ],
       scripts: [
         {
@@ -48,7 +55,10 @@ export const Route = createFileRoute("/article/$slug")({
   notFoundComponent: () => (
     <div className="p-8 text-center">
       <div className="display mb-4 text-xl font-black">Article not found</div>
-      <Link to="/" className="mt-4 inline-block yellow-bar px-4 py-2 font-bold uppercase tracking-widest">
+      <Link
+        to="/"
+        className="mt-4 inline-block yellow-bar px-4 py-2 font-bold uppercase tracking-widest"
+      >
         Back home
       </Link>
     </div>
@@ -81,50 +91,52 @@ function ArticlePage() {
 
     // Twitter / X
     if (hasTwitter) {
-      const load = () => {
-        try {
-          const w = window as any;
-          if (w.twttr?.widgets?.load) w.twttr.widgets.load(root);
-        } catch {}
+      const poll = (attempts = 0) => {
+        const w = window as any;
+        if (w.twttr?.widgets?.load) {
+          try {
+            w.twttr.widgets.load(root);
+          } catch {}
+          return;
+        }
+        if (attempts < 40) {
+          setTimeout(() => poll(attempts + 1), 80);
+        }
       };
-      const existing = document.querySelector(
-        'script[src="https://platform.twitter.com/widgets.js"]',
-      ) as HTMLScriptElement | null;
-      if (existing && (window as any).twttr?.widgets?.load) {
-        setTimeout(load, 0);
-      } else {
-        const s = existing ?? document.createElement("script");
+      if (!document.querySelector('script[src="https://platform.twitter.com/widgets.js"]')) {
+        const s = document.createElement("script");
         s.async = true;
         s.defer = true;
         s.src = "https://platform.twitter.com/widgets.js";
-        s.onload = () => setTimeout(load, 60);
         s.onerror = () => {};
-        if (!existing) document.body.appendChild(s);
+        document.body.appendChild(s);
       }
+      poll();
     }
 
     // Instagram
     if (hasInstagram) {
-      const process = () => {
-        try {
-          const w = window as any;
-          if (w.instgrm?.Embeds?.process) w.instgrm.Embeds.process();
-        } catch {}
+      const poll = (attempts = 0) => {
+        const w = window as any;
+        if (w.instgrm?.Embeds?.process) {
+          try {
+            w.instgrm.Embeds.process();
+          } catch {}
+          return;
+        }
+        if (attempts < 40) {
+          setTimeout(() => poll(attempts + 1), 80);
+        }
       };
-      const existing = document.querySelector(
-        'script[src="https://www.instagram.com/embed.js"]',
-      ) as HTMLScriptElement | null;
-      if (existing && (window as any).instgrm?.Embeds?.process) {
-        setTimeout(process, 0);
-      } else {
-        const s = existing ?? document.createElement("script");
+      if (!document.querySelector('script[src="https://www.instagram.com/embed.js"]')) {
+        const s = document.createElement("script");
         s.async = true;
         s.defer = true;
         s.src = "https://www.instagram.com/embed.js";
-        s.onload = () => setTimeout(process, 60);
         s.onerror = () => {};
-        if (!existing) document.body.appendChild(s);
+        document.body.appendChild(s);
       }
+      poll();
     }
 
     // TikTok
@@ -187,7 +199,9 @@ function ArticlePage() {
             <h1 className="display text-3xl font-black uppercase leading-[0.95] md:text-5xl lg:text-6xl">
               {article.title}
             </h1>
-            {article.dek && <p className="mt-4 text-lg text-muted-foreground md:text-xl">{article.dek}</p>}
+            {article.dek && (
+              <p className="mt-4 text-lg text-muted-foreground md:text-xl">{article.dek}</p>
+            )}
             <div className="meta mt-4 flex flex-wrap gap-x-4 gap-y-1">
               <span>By Entertainment Trends Staff</span>
               {article.category?.name && (
@@ -196,7 +210,9 @@ function ArticlePage() {
                 </Link>
               )}
               {(() => {
-                const published = article.published_at ? new Date(article.published_at).getTime() : 0;
+                const published = article.published_at
+                  ? new Date(article.published_at).getTime()
+                  : 0;
                 const updated = article.updated_at ? new Date(article.updated_at).getTime() : 0;
                 if (published && updated - published > 5000) {
                   return <span>Updated {shortDate(article.updated_at)}</span>;
@@ -211,7 +227,9 @@ function ArticlePage() {
           {article.hero_image_hd && (
             <figure className="mb-8">
               <img src={article.hero_image_hd} alt={article.title} className="w-full" />
-              {article.hero_caption && <figcaption className="meta mt-2">{article.hero_caption}</figcaption>}
+              {article.hero_caption && (
+                <figcaption className="meta mt-2">{article.hero_caption}</figcaption>
+              )}
             </figure>
           )}
 
@@ -285,9 +303,13 @@ function formatArticleBody(body: string) {
   const trimmed = (body || "").trim();
   if (!trimmed) return "<p></p>";
 
-  let enriched = trimmed;
-  if (/<[a-z][\s\S]*>/i.test(trimmed)) {
-    enriched = sanitizeRichText(trimmed);
+  // Ensure any Hostinger upload URLs in body are proxied via same-origin /api/uploads/
+  let enriched = trimmed.replace(
+    /https?:\/\/aliceblue-goose-490382\.hostingersite\.com\/api\/uploads\//gi,
+    "/api/uploads/",
+  );
+  if (/<[a-z][\s\S]*>/i.test(enriched)) {
+    enriched = sanitizeRichText(enriched);
   } else {
     enriched = trimmed
       .split(/\n\n+/)
@@ -295,34 +317,102 @@ function formatArticleBody(body: string) {
       .join("");
   }
 
-  // Enrich: wrap bare (non-figured) iframes in responsive 16:9 wrapper for mobile/desktop
-  // Also normalize YouTube/Vimeo iframes src policy-friendly
+  // Strip any old black backgrounds from database HTML so embeds never have black background gaps
+  enriched = enriched.replace(/\b(bg-black|bg-slate-900|bg-gray-900)\b/g, "bg-transparent");
+  enriched = enriched.replace(/background(-color)?\s*:\s*(#000000|#000|black)/gi, "background: transparent");
+
+  // Transform Instagram blockquotes into responsive, clean embeds (both vertical Reels and horizontal Posts)
   enriched = enriched.replace(
-    /(<iframe\b[^>]*><\/iframe>)/gi,
-    (_m, iframe) => {
-      const insideFigure = /<figure[\s\S]*<\/figure>/i.test(iframe);
-      if (insideFigure) return iframe;
-      const hasWrapper = /<div[^>]*aspect-video/i.test(iframe);
-      if (hasWrapper) return iframe;
-      return `<figure class="my-8 w-full max-w-none"><div class="aspect-video w-full overflow-hidden rounded border border-gray-200 bg-black">${iframe}</div></figure>`;
+    /(?:<figure[^>]*>\s*)?<blockquote\b[^>]*class="[^"]*instagram-media[^"]*"[^>]*>[\s\S]*?<\/blockquote>(?:\s*<\/figure>)?/gi,
+    (fullMatch) => {
+      const permalinkMatch =
+        fullMatch.match(/data-instgrm-permalink="([^"]+)"/i) ||
+        fullMatch.match(/data-embed-permalink="([^"]+)"/i) ||
+        fullMatch.match(/href="([^"]+instagram\.com\/[^"]+)"/i);
+      if (!permalinkMatch) return fullMatch;
+      const permalink = permalinkMatch[1].replace(/^`|`$/g, "").trim();
+      const isReel = /\/(reel|reels)\//i.test(permalink);
+      const cleanLink = permalink.replace(/\/+$/, "");
+      const iframeSrc = `${cleanLink}/embed/`;
+      const maxW = isReel ? "max-w-[340px]" : "max-w-[440px]";
+      const height = isReel ? "580px" : "480px";
+      const title = isReel ? "Instagram Reel" : "Instagram Post";
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${maxW} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${iframeSrc}" title="${title}" class="w-full block border-0 bg-white" style="height: ${height}; min-height: ${height}; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
     },
   );
 
-  // Wrap standalone video tags (non-figured) in responsive container
+  // Transform TikTok blockquotes into responsive vertical embeds
+  enriched = enriched.replace(
+    /(?:<figure[^>]*>\s*)?<blockquote\b[^>]*class="[^"]*tiktok-embed[^"]*"[^>]*>[\s\S]*?<\/blockquote>(?:\s*<\/figure>)?/gi,
+    (fullMatch) => {
+      const idMatch =
+        fullMatch.match(/data-video-id="(\d+)"/i) ||
+        fullMatch.match(/\/video\/(\d+)/i) ||
+        fullMatch.match(/\/v\/(\d+)/i);
+      if (idMatch && idMatch[1]) {
+        const videoId = idMatch[1];
+        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full max-w-[325px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="https://www.tiktok.com/embed/v2/${videoId}" title="TikTok Video" class="w-full block border-0 bg-white" style="height: 580px; min-height: 580px; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
+      }
+      return fullMatch;
+    },
+  );
+
+  // Normalize existing iframe figures (both vertical and horizontal)
+  enriched = enriched.replace(
+    /<figure[^>]*>\s*<div[^>]*class="[^"]*(?:aspect-video|aspect-\[9\/16\]|w-full)[^"]*"[^>]*>\s*(<iframe\b[^>]*src="([^"]*)"[^>]*>[\s\S]*?<\/iframe>)\s*<\/div>\s*<\/figure>/gi,
+    (_m, _iframeTag, src) => {
+      const isVertical = /\/shorts\//i.test(src) || /tiktok\.com/i.test(src) || /\/reel\//i.test(src);
+      if (/instagram\.com\/[^"]*embed/i.test(src)) {
+        const maxW = isVertical ? "max-w-[340px]" : "max-w-[440px]";
+        const height = isVertical ? "580px" : "480px";
+        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${maxW} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="w-full block border-0 bg-white" style="height: ${height}; min-height: ${height}; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
+      }
+      if (isVertical) {
+        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-[9/16] w-full max-w-[320px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+      }
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-video w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+    },
+  );
+
+  // Wrap bare (non-figured) iframes in responsive wrapper (detect vertical vs horizontal, bg-transparent)
+  enriched = enriched.replace(/(<iframe\b[^>]*src="([^"]*)"[^>]*>[\s\S]*?<\/iframe>)/gi, (iframe, src) => {
+    const isVertical = /\/shorts\//i.test(src) || /tiktok\.com/i.test(src) || /\/reel\//i.test(src);
+    if (/instagram\.com\/[^"]*embed/i.test(src)) {
+      const maxW = isVertical ? "max-w-[340px]" : "max-w-[440px]";
+      const height = isVertical ? "580px" : "480px";
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${maxW} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${iframe}</div></figure>`;
+    }
+    if (isVertical) {
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-[9/16] w-full max-w-[320px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+    }
+    return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-video w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+  });
+
+  // Wrap standalone video tags: restrained, centered, bg-transparent
   enriched = enriched.replace(
     /(<video\b[^>]*>(?:[\s\S]*?<\/video>|<video\b[^>]*\/>))/gi,
     (_m, videoTag) => {
-      const insideFigure = /<figure[\s\S]*<\/figure>/i.test(videoTag);
-      if (insideFigure) return videoTag;
-      return `<figure class="my-8 w-full max-w-none"><div class="w-full overflow-hidden rounded border border-gray-200 bg-black">${videoTag}</div></figure>`;
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full max-w-[480px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">${videoTag}</div></figure>`;
     },
   );
 
-  // Wrap known inline social embed blockquotes (twitter/instagram/facebook/tiktok) in a responsive figure so they match inline image/video spacing
-  const embedBQRe = /<figure[^>]*>\s*(<blockquote\s+class="(?:twitter-tweet|instagram-media|fb-post|tiktok-embed)"[^>]*>[\s\S]*?<\/blockquote>)\s*<\/figure>/gi;
-  const standaloneBQRe = /(<blockquote\s+class="(?:twitter-tweet|instagram-media|fb-post|tiktok-embed)"[^>]*>[\s\S]*?<\/blockquote>)(?!\s*<\/figure>)/gi;
-  const wrapEmbed = (bq: string) =>
-    `<figure class="inline-embed my-8 w-full max-w-none overflow-hidden rounded border border-gray-200 bg-white p-3">${bq}</figure>`;
+  // Wrap known inline social embed blockquotes in responsive, correctly sized centered figures (Twitter, Facebook)
+  const embedBQRe =
+    /<figure[^>]*>\s*(<blockquote\b[^>]*class="[^"]*(?:twitter-tweet|fb-post|fb-video)[^"]*"[^>]*>[\s\S]*?<\/blockquote>)\s*<\/figure>/gi;
+  const standaloneBQRe =
+    /(<blockquote\b[^>]*class="[^"]*(?:twitter-tweet|fb-post|fb-video)[^"]*"[^>]*>[\s\S]*?<\/blockquote>)(?!\s*<\/figure>)/gi;
+  const wrapEmbed = (bq: string) => {
+    let cleanBq = bq;
+    const isTwitter = /twitter-tweet/.test(cleanBq);
+    if (isTwitter && !/data-align=/.test(cleanBq)) {
+      cleanBq = cleanBq.replace(/<blockquote\b/i, '<blockquote data-align="center"');
+    }
+    if (/fb-post|fb-video/.test(cleanBq)) {
+      cleanBq = cleanBq.replace(/data-width="[0-9]+"/i, 'data-width="auto"');
+    }
+    const maxW = isTwitter ? "max-w-[460px]" : "max-w-[460px]";
+    return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full ${maxW} mx-auto text-center bg-transparent">${cleanBq}</figure>`;
+  };
   enriched = enriched.replace(embedBQRe, (_m: string, bq: string) => wrapEmbed(bq));
   enriched = enriched.replace(standaloneBQRe, (_m: string, bq: string) => wrapEmbed(bq));
 
@@ -393,41 +483,56 @@ function sanitizeRichText(html: string) {
     if (/^<blockquote\b/i.test(tag)) {
       const attrs: string[] = [];
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
-      if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
+      if (clazz && /^[a-zA-Z0-9_\s\-:\[\]\/%.#]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
       const cite = (tag.match(/\scite="([^"]*)"/i) || tag.match(/\scite='([^']*)'/i) || [])[1];
       if (cite) {
         try {
           const u = new URL(cite);
-          if (u.protocol === "http:" || u.protocol === "https:") attrs.push(`cite="${u.toString().replace(/"/g, "&quot;")}"`);
-        } catch { /* ignore */ }
+          if (u.protocol === "http:" || u.protocol === "https:")
+            attrs.push(`cite="${u.toString().replace(/"/g, "&quot;")}"`);
+        } catch {
+          /* ignore */
+        }
       }
       const lang = (tag.match(/\slang="([^"]*)"/i) || [])[1];
       if (lang && /^[a-zA-Z0-9_-]+$/.test(lang)) attrs.push(`lang="${lang}"`);
       const dir = (tag.match(/\sdir="([^"]*)"/i) || [])[1];
       if (dir === "ltr" || dir === "rtl" || dir === "auto") attrs.push(`dir="${dir}"`);
+      const style = (tag.match(/\sstyle="([^"]*)"/i) || tag.match(/\sstyle='([^']*)'/i) || [])[1];
+      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style))
+        attrs.push(`style="${style.replace(/"/g, "&quot;")}"`);
       const dataRe = /\sdata-([a-zA-Z0-9_-]+)="([^"]*)"/g;
       let dm: RegExpExecArray | null;
       while ((dm = dataRe.exec(tag))) {
         const key = `data-${dm[1].toLowerCase()}`;
         if (attrs.some((a) => a.startsWith(`${key}="`))) continue;
-        const val = String(dm[2]).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        const val = String(dm[2])
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
         attrs.push(`${key}="${val}"`);
       }
       const close = isSelfClosing(tag) ? " />" : ">";
       return `<blockquote${attrs.length ? " " + attrs.join(" ") : ""}${close}`;
     }
 
-    // Figure: keep class + data-*
+    // Figure: keep class, style + data-*
     if (/^<figure\b/i.test(tag)) {
       const attrs: string[] = [];
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
-      if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
+      if (clazz && /^[a-zA-Z0-9_\s\-:\[\]\/%.#]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
+      const style = (tag.match(/\sstyle="([^"]*)"/i) || tag.match(/\sstyle='([^']*)'/i) || [])[1];
+      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style))
+        attrs.push(`style="${style.replace(/"/g, "&quot;")}"`);
       const dataRe = /\sdata-([a-zA-Z0-9_-]+)="([^"]*)"/g;
       let dm: RegExpExecArray | null;
       while ((dm = dataRe.exec(tag))) {
         const key = `data-${dm[1].toLowerCase()}`;
         if (attrs.some((a) => a.startsWith(`${key}="`))) continue;
-        const val = String(dm[2]).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        const val = String(dm[2])
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
         attrs.push(`${key}="${val}"`);
       }
       const close = isSelfClosing(tag) ? " />" : ">";
@@ -449,15 +554,22 @@ function sanitizeRichText(html: string) {
 
     // Structural tags: keep only valid class + proper close bracket
     if (/^<(figcaption|div|p|span|ul|ol|li|section|br|strong|b|em|i|u|h2|h3|h4)\b/i.test(tag)) {
-      const m = tag.match(/^<(figcaption|div|p|span|ul|ol|li|section|br|strong|b|em|i|u|h2|h3|h4)\b/i);
+      const m = tag.match(
+        /^<(figcaption|div|p|span|ul|ol|li|section|br|strong|b|em|i|u|h2|h3|h4)\b/i,
+      );
       if (!m) return tag;
       const tagName = m[1].toLowerCase();
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
+      const style = (tag.match(/\sstyle="([^"]*)"/i) || tag.match(/\sstyle='([^']*)'/i) || [])[1];
       const close = isSelfClosing(tag) ? " />" : ">";
-      if (clazz && /^[\w\s-]+$/.test(clazz)) {
-        return `<${tagName} class="${clazz}"${close}`;
+      const attrs: string[] = [];
+      if (clazz && /^[a-zA-Z0-9_\s\-:\[\]\/%.#]+$/.test(clazz)) {
+        attrs.push(`class="${clazz}"`);
       }
-      return `<${tagName}${close}`;
+      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style)) {
+        attrs.push(`style="${style.replace(/"/g, "&quot;")}"`);
+      }
+      return `<${tagName}${attrs.length ? " " + attrs.join(" ") : ""}${close}`;
     }
 
     return tag;
@@ -486,9 +598,7 @@ function normalizeSocialEmbedBlockquotes(html: string): string {
 
     const classes = ["twitter-tweet", "instagram-media", "fb-post", "tiktok-embed"];
     const blockquotes = Array.from(
-      scratch.querySelectorAll<HTMLElement>(
-        classes.map((c) => `blockquote.${c}`).join(","),
-      ),
+      scratch.querySelectorAll<HTMLElement>(classes.map((c) => `blockquote.${c}`).join(",")),
     );
 
     for (const bq of blockquotes) {
@@ -576,55 +686,63 @@ function EmbeddedPost({ url }: { url: string }) {
     let cancelled = false;
 
     if (embed.type === "instagram") {
-      const process = () => {
+      const poll = (attempts = 0) => {
         if (cancelled) return;
-        try {
-          (window as any).instgrm?.Embeds?.process?.();
-        } catch {}
+        const w = window as any;
+        if (w.instgrm?.Embeds?.process) {
+          try {
+            w.instgrm.Embeds.process();
+          } catch {}
+          return;
+        }
+        if (attempts < 40) {
+          setTimeout(() => poll(attempts + 1), 80);
+        }
       };
 
-      const existingScript = document.querySelector('script[src="https://www.instagram.com/embed.js"]') as HTMLScriptElement | null;
-      if (existingScript && (window as any).instgrm?.Embeds?.process) {
-        setTimeout(process, 0);
-        return;
+      if (!document.querySelector('script[src="https://www.instagram.com/embed.js"]')) {
+        const script = document.createElement("script");
+        script.async = true;
+        script.defer = true;
+        script.src = "https://www.instagram.com/embed.js";
+        script.onerror = () => {};
+        document.body.appendChild(script);
       }
-
-      const script = existingScript ?? document.createElement("script");
-      script.async = true;
-      script.defer = true;
-      script.src = "https://www.instagram.com/embed.js";
-      script.onload = () => setTimeout(process, 50);
-      script.onerror = () => {};
-      if (!existingScript) document.body.appendChild(script);
+      poll();
       return;
     }
 
     if (embed.type === "twitter") {
-      const load = () => {
+      const poll = (attempts = 0) => {
         if (cancelled) return;
-        try {
-          (window as any).twttr?.widgets?.load?.();
-        } catch {}
+        const w = window as any;
+        if (w.twttr?.widgets?.load) {
+          try {
+            w.twttr.widgets.load();
+          } catch {}
+          return;
+        }
+        if (attempts < 40) {
+          setTimeout(() => poll(attempts + 1), 80);
+        }
       };
 
-      const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]') as HTMLScriptElement | null;
-      if (existingScript && (window as any).twttr?.widgets?.load) {
-        setTimeout(load, 0);
-        return;
+      if (!document.querySelector('script[src="https://platform.twitter.com/widgets.js"]')) {
+        const script = document.createElement("script");
+        script.async = true;
+        script.defer = true;
+        script.src = "https://platform.twitter.com/widgets.js";
+        script.onerror = () => {};
+        document.body.appendChild(script);
       }
-
-      const script = existingScript ?? document.createElement("script");
-      script.async = true;
-      script.defer = true;
-      script.src = "https://platform.twitter.com/widgets.js";
-      script.onload = () => setTimeout(load, 50);
-      script.onerror = () => {};
-      if (!existingScript) document.body.appendChild(script);
+      poll();
       return;
     }
 
     if (embed.type === "tiktok") {
-      const existingScript = document.querySelector('script[src="https://www.tiktok.com/embed.js"]') as HTMLScriptElement | null;
+      const existingScript = document.querySelector(
+        'script[src="https://www.tiktok.com/embed.js"]',
+      ) as HTMLScriptElement | null;
       if (existingScript) return;
 
       const script = document.createElement("script");
@@ -657,31 +775,31 @@ function EmbeddedPost({ url }: { url: string }) {
   }
 
   if (embed.type === "instagram") {
+    const isReel = /\/(reel|reels)\//i.test(embed.permalink);
+    const cleanUrl = embed.permalink.replace(/\/+$/, "");
+    const iframeSrc = `${cleanUrl}/embed/`;
+    const containerMaxW = isReel ? "max-w-[340px]" : "max-w-[440px]";
+    const height = isReel ? 580 : 480;
+
     return (
-      <section className="mb-8">
-        <div className="overflow-hidden rounded border border-gray-200 bg-white p-3">
-          <blockquote
-            className="instagram-media mx-auto w-full min-w-0"
-            data-instgrm-captioned
-            data-instgrm-permalink={embed.permalink}
-            data-instgrm-version="14"
-          >
-            <a href={embed.permalink} target="_blank" rel="noreferrer">
-              View this post on Instagram
-            </a>
-          </blockquote>
-          <noscript>
-            <iframe
-              src={`https://www.instagram.com/p/${embed.permalink.split("/").filter(Boolean).pop()}/embed/captioned/`}
-              width="100%"
-              height="720"
-              frameBorder="0"
-              scrolling="no"
-              allowTransparency
-              title="Instagram post"
-              className="w-full border-0"
-            />
-          </noscript>
+      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
+        <div
+          className={`w-full ${containerMaxW} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm`}
+        >
+          <iframe
+            src={iframeSrc}
+            title={isReel ? "Instagram Reel" : "Instagram Post"}
+            className="w-full block border-0 bg-white"
+            style={{
+              height: `${height}px`,
+              minHeight: `${height}px`,
+              width: "100%",
+              border: 0,
+            }}
+            scrolling="no"
+            frameBorder="0"
+            allowTransparency
+          />
         </div>
       </section>
     );
@@ -689,9 +807,14 @@ function EmbeddedPost({ url }: { url: string }) {
 
   if (embed.type === "twitter") {
     return (
-      <section className="mb-8">
-        <div className="overflow-hidden rounded border border-gray-200 bg-white p-3">
-          <blockquote className="twitter-tweet mx-auto" data-conversation="none" data-dnt="true">
+      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
+        <div className="w-full max-w-[460px] mx-auto flex justify-center">
+          <blockquote
+            className="twitter-tweet mx-auto"
+            data-align="center"
+            data-conversation="none"
+            data-dnt="true"
+          >
             <a href={embed.permalink} target="_blank" rel="noreferrer">
               {embed.permalink}
             </a>
@@ -702,49 +825,78 @@ function EmbeddedPost({ url }: { url: string }) {
   }
 
   if (embed.type === "youtube") {
+    const isShorts =
+      (embed as any).isShorts ||
+      embed.src.includes("/shorts/") ||
+      url.includes("/shorts/");
+    const aspectClass = isShorts ? "aspect-[9/16] max-w-[320px]" : "aspect-video max-w-[500px]";
     return (
-      <section className="mb-8">
-        <div className="overflow-hidden rounded border border-gray-200 bg-white">
-          <div className="aspect-video w-full">
-            <iframe
-              src={embed.src}
-              title="Embedded YouTube video"
-              className="h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-              loading="lazy"
-            />
-          </div>
+      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
+        <div className={`${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm`}>
+          <iframe
+            src={embed.src}
+            title="Embedded YouTube video"
+            className="h-full w-full block border-0 bg-transparent"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+            loading="lazy"
+          />
         </div>
       </section>
     );
   }
 
   if (embed.type === "facebook") {
-    const fbHref = encodeURIComponent((embed as any).href);
+    const rawHref = (embed as any).href || url;
+    const isVideo =
+      rawHref.includes("/videos/") ||
+      rawHref.includes("/watch") ||
+      rawHref.includes("fb.watch") ||
+      rawHref.includes("/reel/");
+    const isReel = rawHref.includes("/reel/") || rawHref.includes("/reels/");
+    const fbHref = encodeURIComponent(rawHref);
+    const iframeSrc = isVideo
+      ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto`
+      : `https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=auto`;
+    const containerClass = isReel
+      ? "aspect-[9/16] max-w-[320px]"
+      : isVideo
+        ? "aspect-video max-w-[480px]"
+        : "max-w-[440px]";
+
     return (
-      <section className="mb-8">
-        <div className="overflow-hidden rounded border border-gray-200 bg-white p-3">
+      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
+        <div
+          className={`w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm`}
+        >
           <iframe
-            src={`https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=500`}
+            src={iframeSrc}
             width="100%"
-            height="560"
-            style={{ border: "none", overflow: "hidden" }}
+            height={isReel || isVideo ? "100%" : "480"}
+            style={{
+              border: "none",
+              overflow: "hidden",
+              width: "100%",
+              height: isReel || isVideo ? "100%" : undefined,
+              minHeight: isReel || isVideo ? "100%" : "250px",
+              background: "transparent",
+            }}
             scrolling="no"
             frameBorder="0"
             allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
             allowFullScreen
-            title="Facebook post"
+            title="Facebook content"
+            className="w-full mx-auto block bg-transparent"
           />
-          <div className="mt-2">
+          <div className="p-2 text-center w-full bg-white/80">
             <a
-              href={(embed as any).href}
+              href={rawHref}
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-bold underline text-black break-all"
+              className="text-xs font-bold underline text-black break-all"
             >
-              {(embed as any).href}
+              View on Facebook
             </a>
           </div>
         </div>
@@ -753,21 +905,33 @@ function EmbeddedPost({ url }: { url: string }) {
   }
 
   if (embed.type === "tiktok") {
+    const videoId = embed.videoId;
     return (
-      <section className="mb-8">
-        <div className="overflow-hidden rounded border border-gray-200 bg-white p-3">
-          <blockquote
-            className="tiktok-embed mx-auto"
-            cite={embed.permalink}
-            data-video-id={embed.videoId}
-            style={{ maxWidth: "605px", minWidth: "325px" }}
-          >
-            <section>
-              <a href={embed.permalink} target="_blank" rel="noreferrer">
-                {embed.permalink}
-              </a>
-            </section>
-          </blockquote>
+      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
+        <div className="w-full max-w-[325px] mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          {videoId ? (
+            <iframe
+              src={`https://www.tiktok.com/embed/v2/${videoId}`}
+              title="TikTok video"
+              className="w-full block border-0 bg-white"
+              style={{ height: "580px", minHeight: "580px", width: "100%", border: 0 }}
+              scrolling="no"
+              frameBorder="0"
+              allowTransparency
+            />
+          ) : (
+            <blockquote
+              className="tiktok-embed mx-auto"
+              cite={embed.permalink}
+              style={{ maxWidth: "325px", minWidth: "260px", margin: "0 auto" }}
+            >
+              <section>
+                <a href={embed.permalink} target="_blank" rel="noreferrer">
+                  {embed.permalink}
+                </a>
+              </section>
+            </blockquote>
+          )}
         </div>
       </section>
     );
@@ -793,7 +957,12 @@ function getEmbedConfig(url: string) {
     const parsed = new URL(url.trim());
     const host = parsed.hostname.replace(/^www\./, "");
 
-    if (host === "twitter.com" || host === "x.com" || host === "mobile.twitter.com" || host === "m.x.com") {
+    if (
+      host === "twitter.com" ||
+      host === "x.com" ||
+      host === "mobile.twitter.com" ||
+      host === "m.x.com"
+    ) {
       const cleanPath = parsed.pathname.replace(/\/+$/, "") || "/";
       return {
         type: "twitter" as const,
@@ -803,7 +972,12 @@ function getEmbedConfig(url: string) {
 
     if (host === "instagram.com" || host === "m.instagram.com" || host === "instagr.am") {
       const pathOnly = parsed.pathname.replace(/\/+$/, "") + "/";
-      if (pathOnly.startsWith("/p/") || pathOnly.startsWith("/reel/") || pathOnly.startsWith("/tv/") || pathOnly.startsWith("/stories/")) {
+      if (
+        pathOnly.startsWith("/p/") ||
+        pathOnly.startsWith("/reel/") ||
+        pathOnly.startsWith("/tv/") ||
+        pathOnly.startsWith("/stories/")
+      ) {
         return {
           type: "instagram" as const,
           permalink: `https://www.instagram.com${pathOnly}`,
@@ -815,12 +989,23 @@ function getEmbedConfig(url: string) {
       };
     }
 
-    if (host === "youtube.com" || host === "m.youtube.com" || host === "youtu.be" || host === "youtube-nocookie.com" || host === "music.youtube.com") {
+    if (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "youtu.be" ||
+      host === "youtube-nocookie.com" ||
+      host === "music.youtube.com"
+    ) {
       const videoId = getYouTubeVideoId(parsed);
+      const isShorts =
+        parsed.pathname.startsWith("/shorts/") ||
+        parsed.pathname.includes("/shorts/") ||
+        url.includes("/shorts/");
       if (videoId) {
         return {
           type: "youtube" as const,
           src: `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`,
+          isShorts,
         };
       }
     }
@@ -848,7 +1033,12 @@ function getEmbedConfig(url: string) {
       };
     }
 
-    if (host === "facebook.com" || host.endsWith(".facebook.com") || host === "fb.watch" || host === "fb.com") {
+    if (
+      host === "facebook.com" ||
+      host.endsWith(".facebook.com") ||
+      host === "fb.watch" ||
+      host === "fb.com"
+    ) {
       return {
         type: "facebook" as const,
         href: parsed.toString(),

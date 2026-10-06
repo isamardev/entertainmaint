@@ -12,7 +12,11 @@ export const Route = createFileRoute("/admin/categories")({ component: Categorie
 function CategoriesAdmin() {
   const { isSuperAdmin } = useAuth();
   const qc = useQueryClient();
-  const { data = [], isLoading, error } = useQuery({ queryKey: ["categories"], queryFn: categoryService.list });
+  const {
+    data = [],
+    isLoading,
+    error,
+  } = useQuery({ queryKey: ["categories"], queryFn: categoryService.list });
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -75,7 +79,11 @@ function CategoriesAdmin() {
                   {(() => {
                     const raw = (error as any)?.message as string | undefined;
                     if (!raw) return "Please refresh the page and try again.";
-                    if (raw.includes("<") || raw.includes("DOCTYPE") || raw.startsWith("Unexpected token")) {
+                    if (
+                      raw.includes("<") ||
+                      raw.includes("DOCTYPE") ||
+                      raw.startsWith("Unexpected token")
+                    ) {
                       return "Something went wrong. Please try again later.";
                     }
                     if (raw.length > 220) return raw.slice(0, 220) + "…";
@@ -94,40 +102,40 @@ function CategoriesAdmin() {
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-auto border border-gray-200">
-          {data.map((c) => (
-            <div
-              key={c.id}
-              className="flex items-center justify-between gap-3 border-b border-gray-200 p-3 last:border-0"
-            >
-              <div className="min-w-0">
-                <div className="truncate font-semibold">{c.name}</div>
-                <div className="truncate text-xs text-black">{c.slug}</div>
+            {data.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between gap-3 border-b border-gray-200 p-3 last:border-0"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-semibold">{c.name}</div>
+                  <div className="truncate text-xs text-black">{c.slug}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingId(c.id);
+                      setName(c.name);
+                      setSlug(c.slug);
+                      setErr(null);
+                    }}
+                    className="p-1 text-black hover:text-gray-700"
+                    aria-label="Edit category"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModal({ isOpen: true, id: c.id, name: c.name })}
+                    className="p-1 text-red-600 hover:text-red-800"
+                    aria-label="Delete category"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingId(c.id);
-                    setName(c.name);
-                    setSlug(c.slug);
-                    setErr(null);
-                  }}
-                  className="p-1 text-black hover:text-gray-700"
-                  aria-label="Edit category"
-                >
-                  <Pencil size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeleteModal({ isOpen: true, id: c.id, name: c.name })}
-                  className="p-1 text-red-600 hover:text-red-800"
-                  aria-label="Delete category"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
           </div>
         )}
       </div>

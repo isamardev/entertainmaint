@@ -19,12 +19,43 @@ function readTokenAnywhere(): string | null {
   return null;
 }
 
+export const SESSION_MAX_DURATION_MS = 20 * 60 * 1000; // 20 minutes
+const LAST_ACTIVITY_KEY = "admin_auth_last_activity";
+const SESSION_START_KEY = "admin_auth_session_start";
+
+export function isSessionExpired(): boolean {
+  if (typeof window === "undefined") return false;
+  const token = readTokenAnywhere();
+  if (!token) return false;
+  const lastActivity = Number(localStorage.getItem(LAST_ACTIVITY_KEY) || 0);
+  if (!lastActivity) return false;
+  return Date.now() - lastActivity >= SESSION_MAX_DURATION_MS;
+}
+
+export function touchAdminSession(): void {
+  if (typeof window === "undefined") return;
+  const token = readTokenAnywhere();
+  if (!token) return;
+  if (isSessionExpired()) {
+    clearAdminToken();
+    return;
+  }
+  localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+}
+
 export function getAdminToken(): string | null {
+  if (isSessionExpired()) {
+    clearAdminToken();
+    return null;
+  }
   return readTokenAnywhere();
 }
 
 export function setAdminToken(token: string, remember: boolean = true): void {
   if (typeof window === "undefined") return;
+  const now = String(Date.now());
+  localStorage.setItem(SESSION_START_KEY, now);
+  localStorage.setItem(LAST_ACTIVITY_KEY, now);
   if (remember) {
     localStorage.setItem(TOKEN_KEY_LS, token);
     sessionStorage.removeItem(TOKEN_KEY_SS);
@@ -42,6 +73,8 @@ export function clearAdminToken(): void {
     localStorage.removeItem(TOKEN_KEY_LS);
     sessionStorage.removeItem(TOKEN_KEY_SS);
     localStorage.removeItem(REMEMBER_KEY);
+    localStorage.removeItem(SESSION_START_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
   }
   clearLegacyAdminStorage();
 }
@@ -64,12 +97,18 @@ type ApiError = { error?: string };
 
 type AdminResult<T> = Promise<T & ApiError>;
 
-async function parseAdminResponseInner<T>(text: string, status: number, headers: Headers): AdminResult<T> {
+async function parseAdminResponseInner<T>(
+  text: string,
+  status: number,
+  headers: Headers,
+): AdminResult<T> {
   const trimmed = text.trim();
   if (!trimmed) {
     if (status >= 200 && status < 300) return {} as any;
     if (status === 404) {
-      throw new Error("The requested page or action is currently unavailable. Please try again later.");
+      throw new Error(
+        "The requested page or action is currently unavailable. Please try again later.",
+      );
     }
     throw new Error("Something went wrong. Please try again later.");
   }
@@ -78,16 +117,16 @@ async function parseAdminResponseInner<T>(text: string, status: number, headers:
     /<html[\s>]/i.test(trimmed.slice(0, 512));
   if (looksHtml) {
     if (status === 404) {
-      throw new Error("The requested page or action is currently unavailable. Please try again later.");
+      throw new Error(
+        "The requested page or action is currently unavailable. Please try again later.",
+      );
     }
     throw new Error("Something went wrong. Please try again later.");
   }
   const ct = headers.get("content-type");
   const isJsonLike =
     !!ct &&
-    (/application\/json/i.test(ct) ||
-      /application\/.*\+json/i.test(ct) ||
-      /text\/json/i.test(ct));
+    (/application\/json/i.test(ct) || /application\/.*\+json/i.test(ct) || /text\/json/i.test(ct));
   let parsed: unknown;
   if (isJsonLike || /^[\[{]/.test(trimmed)) {
     try {
@@ -117,7 +156,10 @@ async function parseAdminResponseInner<T>(text: string, status: number, headers:
 }
 
 function networkErrorText(error: unknown): string {
-  if (error instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(error.message)) {
+  if (
+    error instanceof TypeError &&
+    /failed to fetch|networkerror|load failed/i.test(error.message)
+  ) {
     return "Unable to reach the server. Please check your internet connection and try again.";
   }
   if (error instanceof Error && error.message && !/<|DOCTYPE/i.test(error.message)) {
@@ -131,6 +173,7 @@ export async function adminApiRequest(
   init: RequestInit = {},
 ): Promise<Response> {
   const token = getAdminToken();
+  if (token) touchAdminSession();
   const headers = new Headers(init.headers ?? {});
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (
@@ -149,7 +192,10 @@ export async function adminApiRequest(
   try {
     const res = await fetch(url, { ...init, headers });
     if (res.status === 401) {
-      const text = await res.clone().text().catch(() => "");
+      const text = await res
+        .clone()
+        .text()
+        .catch(() => "");
       if (/session|Invalid or expired/i.test(text) || /expired/i.test(text)) clearAdminToken();
     }
     return res;
@@ -159,7 +205,11 @@ export async function adminApiRequest(
 }
 
 export const adminAuthService = {
-  async login(email: string, password: string, remember: boolean = true): Promise<{ error?: string; email?: string }> {
+  async login(
+    email: string,
+    password: string,
+    remember: boolean = true,
+  ): Promise<{ error?: string; email?: string }> {
     try {
       const res = await fetch(getApiUrl("/admin/login"), {
         method: "POST",
@@ -220,9 +270,7 @@ export const adminAuthService = {
     } catch (error) {
       return {
         error:
-          error instanceof Error && error.message
-            ? error.message
-            : "Failed to update username.",
+          error instanceof Error && error.message ? error.message : "Failed to update username.",
       };
     }
   },

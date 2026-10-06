@@ -26,6 +26,7 @@ function AdminArticles() {
     queryKey: ["admin-articles"],
     queryFn: articleService.listAll,
   });
+
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     id: number;
@@ -60,6 +61,7 @@ function AdminArticles() {
       <div className="mb-4 shrink-0">
         <h2 className="display text-xl font-black uppercase">{titleByStatus[statusFilter]}</h2>
       </div>
+
       {isLoading ? (
         <div className="text-sm text-black">Loading articles…</div>
       ) : error ? (
@@ -131,7 +133,7 @@ function AdminArticles() {
                     <td className="p-3 text-right flex items-center justify-end gap-2">
                       <Link
                         to="/admin/edit/$id"
-                        params={{ id: a.id }}
+                        params={{ id: String(a.id) }}
                         className="p-1 text-black hover:text-gray-700"
                       >
                         <Pencil size={18} />
@@ -157,6 +159,7 @@ function AdminArticles() {
           </div>
         </div>
       )}
+
       <DeleteModal
         isOpen={deleteModal.isOpen}
         title="Delete Article"

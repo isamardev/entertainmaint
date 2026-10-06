@@ -23,7 +23,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <Menu size={24} />
         </button>
         <img src="/logo.png" alt="Entertainment Trends" className="h-8 w-8 object-contain" />
-        <span className="display text-sm font-black uppercase tracking-wide text-black">Admin Panel</span>
+        <span className="display text-sm font-black uppercase tracking-wide text-black">
+          Admin Panel
+        </span>
       </header>
 
       {sidebarOpen && (

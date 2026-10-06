@@ -1,4 +1,3 @@
-
 export function DeleteModal({
   isOpen,
   title,

@@ -45,7 +45,7 @@
   --surface: oklch(0.97 0.005 260); /* Light gray surface */
   --surface-2: oklch(0.94 0.005 260);
   --muted-foreground: oklch(0.45 0.01 260);
-  --primary: oklch(0 0 0);          /* Black */
+  --primary: oklch(0 0 0); /* Black */
   --primary-foreground: oklch(1 0 0);
   --destructive: oklch(0.62 0.22 27);
   --border: oklch(0.85 0.005 260);
@@ -121,8 +121,6 @@
   color: var(--color-primary-foreground);
 }
 
-
-
 @utility trending-track {
   /* Static trending — animation intentionally disabled (was marquee scroll). */
   transform: translateX(0);
@@ -150,7 +148,6 @@
 .trending-scroll::-webkit-scrollbar-thumb:hover {
   filter: brightness(1.05);
 }
-
 
 @utility ticker-track {
   animation: ticker 40s linear infinite;
@@ -187,3 +184,187 @@
     }
   }
 }
+
+/* Rich text editor and content links styling */
+.art-rich-editor a,
+.art-rich-editor a:visited,
+.art-editor-link,
+[contenteditable="true"] a {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  text-decoration-thickness: 1.5px !important;
+  text-underline-offset: 3px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+}
+
+.art-rich-editor a:hover,
+.art-editor-link:hover,
+[contenteditable="true"] a:hover {
+  color: #1e40af !important;
+  text-decoration: underline !important;
+}
+
+/* ==========================================================================
+   Social Media Embeds Centering & Responsive Sizing (Twitter, Instagram, TikTok, Facebook, YouTube)
+   ========================================================================== */
+
+/* Container centering & size bounds */
+.prose .inline-embed,
+figure.inline-embed,
+.inline-embed,
+.embedded-post-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  text-align: center !important;
+  background-color: transparent !important;
+  overflow: visible !important;
+  clear: both !important;
+}
+
+/* Reset Tailwind typography prose quote styling on social embeds */
+.prose blockquote.twitter-tweet,
+.prose blockquote.instagram-media,
+.prose blockquote.tiktok-embed,
+.prose blockquote.fb-post,
+.prose blockquote.fb-video,
+.prose .inline-embed blockquote,
+blockquote.twitter-tweet,
+blockquote.instagram-media,
+blockquote.tiktok-embed,
+blockquote.fb-post,
+blockquote.fb-video {
+  border-left: none !important;
+  font-style: normal !important;
+  quotes: none !important;
+  padding: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  background-color: transparent !important;
+}
+
+.prose blockquote.twitter-tweet::before,
+.prose blockquote.twitter-tweet::after,
+.prose blockquote.instagram-media::before,
+.prose blockquote.instagram-media::after,
+.prose blockquote.tiktok-embed::before,
+.prose blockquote.tiktok-embed::after,
+.prose blockquote.fb-post::before,
+.prose blockquote.fb-post::after,
+.prose blockquote.fb-video::before,
+.prose blockquote.fb-video::after {
+  content: none !important;
+}
+
+/* Twitter / X centering */
+.twitter-tweet,
+iframe.twitter-tweet,
+iframe[id^="twitter-widget-"] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  max-width: 500px !important;
+  width: 100% !important;
+  display: block !important;
+  box-sizing: border-box !important;
+}
+
+/* Instagram centering & official responsive limits */
+blockquote.instagram-media,
+iframe.instagram-media,
+iframe.instagram-media-rendered,
+iframe[src*="instagram.com"] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  max-width: 440px !important;
+  width: 100% !important;
+  display: block !important;
+  background-color: #ffffff !important;
+  box-sizing: border-box !important;
+}
+
+/* Instagram Reel is vertical: restrained to 340px */
+div[class*="max-w-\[340px\]"] iframe[src*="instagram.com"],
+div[class*="max-w-[340px]"] iframe[src*="instagram.com"],
+blockquote.instagram-media[data-embed-type="reel"],
+iframe.instagram-media-reel {
+  max-width: 340px !important;
+}
+
+/* TikTok centering */
+blockquote.tiktok-embed,
+iframe.tiktok-embed,
+iframe[src*="tiktok.com"] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  max-width: 325px !important;
+  width: 100% !important;
+  display: block !important;
+  background-color: #ffffff !important;
+  box-sizing: border-box !important;
+}
+
+/* Facebook post & video centering */
+blockquote.fb-post,
+blockquote.fb-video,
+.fb-post,
+.fb-video,
+iframe[src*="facebook.com"] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  max-width: 460px !important;
+  box-sizing: border-box !important;
+  background-color: transparent !important;
+}
+
+/* Embed video wrappers: transparent background, zero black gaps */
+.prose figure div[class*="aspect-video"],
+.prose figure div[class*="aspect-"],
+figure div[class*="aspect-video"],
+figure div[class*="aspect-"],
+section div[class*="aspect-video"],
+section div[class*="aspect-"] {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* YouTube & video iframes: transparent background so no player letterbox black gaps */
+iframe[src*="youtube.com"],
+iframe[src*="youtube-nocookie.com"],
+iframe[src*="youtu.be"],
+iframe[src*="vimeo.com"] {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Only video iframes inside explicit aspect-ratio wrappers stretch to 100% width and height */
+div[class*="aspect-"] > iframe,
+div[class*="aspect-video"] > iframe,
+div[class*="aspect-[9/16]"] > iframe {
+  display: block !important;
+  border: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Figure & embed container centering */
+figure.inline-embed,
+figure[class*="inline-embed"] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  text-align: center !important;
+  width: 100% !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { articleService, categoryService, type Article } from "@/services/articleService";
+import {
+  articleService,
+  categoryService,
+  normalizeMediaUrl,
+  type Article,
+} from "@/services/articleService";
 import { getApiUrl } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -51,11 +56,24 @@ function ensureRemoveStylesInjected() {
     "  padding-top:6px;" +
     "}" +
     ".art-inline-wrap{" +
-    "  position:relative;" +
+    "  position:relative; background:transparent !important;" +
     "}" +
     ".art-inline-wrap:hover{ outline:2px dashed #6b7280; outline-offset:3px; border-radius:10px; }" +
+    ".art-inline-wrap iframe{ display:block !important; border:0 !important; background:transparent !important; width:100% !important; height:100% !important; }" +
     ".art-inline-caption{" +
     "  margin:0; font-size:12px; color:#4b5563; flex:1 1 auto; min-width:0;" +
+    "}" +
+    ".art-rich-editor a, .art-rich-editor a:visited, .art-editor-link, [contenteditable] a{" +
+    "  color:#1d4ed8 !important;" +
+    "  text-decoration:underline !important;" +
+    "  text-decoration-thickness:1.5px !important;" +
+    "  text-underline-offset:3px !important;" +
+    "  font-weight:600 !important;" +
+    "  cursor:pointer !important;" +
+    "}" +
+    ".art-rich-editor a:hover, .art-editor-link:hover, [contenteditable] a:hover{" +
+    "  color:#1e40af !important;" +
+    "  text-decoration:underline !important;" +
     "}" +
     "";
   document.head.appendChild(style);
@@ -64,7 +82,12 @@ function ensureRemoveStylesInjected() {
 type Props = {
   initial?: Partial<Article>;
   onSaved: (a: any) => void;
-  uploadingState?: { uploading: boolean; progress: number | null; setUploading: (v: boolean) => void; setProgress: (p: number | null) => void };
+  uploadingState?: {
+    uploading: boolean;
+    progress: number | null;
+    setUploading: (v: boolean) => void;
+    setProgress: (p: number | null) => void;
+  };
 };
 
 function slugify(s: string) {
@@ -81,14 +104,14 @@ function stripTransientHtml(sourceHtml: string): string {
   const scratch = document.createElement("div");
   scratch.innerHTML = sourceHtml;
   scratch.querySelectorAll("button.art-inline-remove").forEach((b) => b.remove());
-  scratch.querySelectorAll<HTMLElement>("[data-art-block=\"1\"], figure").forEach((blk) => {
+  scratch.querySelectorAll<HTMLElement>('[data-art-block="1"], figure').forEach((blk) => {
     blk.classList.remove("art-inline-wrap");
     blk.removeAttribute("data-art-block");
     const row = blk.querySelector<HTMLElement>(":scope > .art-inline-row");
     if (row) row.remove();
     const existingFigCap = blk.querySelector<HTMLElement>(":scope > figcaption");
     if (existingFigCap) existingFigCap.remove();
-    blk.querySelectorAll<HTMLElement>("br[data-art-spacer=\"1\"]").forEach((br) => br.remove());
+    blk.querySelectorAll<HTMLElement>('br[data-art-spacer="1"]').forEach((br) => br.remove());
   });
   scratch.querySelectorAll(".art-inline-row").forEach((r) => {
     r.remove();
@@ -122,6 +145,13 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
   const [localUploadProgress, setLocalUploadProgress] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState(false);
+  const [titleError, setTitleError] = useState(false);
+  const [dekError, setDekError] = useState(false);
+  const [heroImageError, setHeroImageError] = useState(false);
+
+  const titleRef = useRef<HTMLInputElement>(null);
+  const dekRef = useRef<HTMLTextAreaElement>(null);
+  const heroBoxRef = useRef<HTMLDivElement>(null);
 
   const isUploading = uploadingState ? uploadingState.uploading : localUploading;
   const progressPct = uploadingState ? uploadingState.progress : localUploadProgress;
@@ -152,8 +182,10 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
       const formData = new FormData();
       formData.append("image", prepared);
       const data = await uploadWithProgress(getApiUrl("/upload"), formData, (p) => setP(p));
-      set("hero_image_hd", data.imageUrl);
-      set("hero_image_lq", data.imageUrl);
+      const normalizedImg = normalizeMediaUrl(data.imageUrl);
+      set("hero_image_hd", normalizedImg);
+      set("hero_image_lq", normalizedImg);
+      setHeroImageError(false);
       setP(100);
       toast.success("Image uploaded successfully!");
     } catch (e: any) {
@@ -168,18 +200,51 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+
+    const titleTrimmed = (form.title || "").trim();
+    if (!titleTrimmed) {
+      setTitleError(true);
+      toast.error("Please enter a title before saving the article.");
+      titleRef.current?.focus();
+      return;
+    }
+    setTitleError(false);
+
+    const dekTrimmed = (form.dek || "").trim();
+    if (!dekTrimmed) {
+      setDekError(true);
+      toast.error("Please enter a description (dek) before saving the article.");
+      dekRef.current?.focus();
+      return;
+    }
+    setDekError(false);
+
     if (!categoryId) {
       setCategoryError(true);
       toast.error("Please select a category before saving the article.");
       return;
     }
     setCategoryError(false);
+
+    const heroImage = (form.hero_image_hd || form.hero_image_lq || "").trim();
+    if (!heroImage) {
+      setHeroImageError(true);
+      toast.error("Please upload or provide a hero image before saving the article.");
+      heroBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setHeroImageError(false);
+
     setSaving(true);
     try {
       const payload: Partial<Article> = {
         ...form,
+        title: titleTrimmed,
+        dek: dekTrimmed,
+        hero_image_hd: heroImage,
+        hero_image_lq: heroImage,
         category_id: categoryId,
-        slug: (form.slug && form.slug.length > 0 ? form.slug : slugify(form.title ?? "")) as string,
+        slug: (form.slug && form.slug.length > 0 ? form.slug : slugify(titleTrimmed)) as string,
         published_at:
           form.status === "published" ? (form.published_at ?? new Date().toISOString()) : null,
       };
@@ -200,14 +265,34 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
   return (
     <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <div className="space-y-4">
-        <Field label="Title">
+        <Field
+          label={
+            <span>
+              Title <span className="text-red-600">*</span>
+            </span>
+          }
+        >
           <input
+            ref={titleRef}
             required
             value={form.title ?? ""}
-            onChange={(e) => set("title", e.target.value)}
+            onChange={(e) => {
+              set("title", e.target.value);
+              if (e.target.value.trim() && titleError) setTitleError(false);
+            }}
             onBlur={(e) => !form.slug && set("slug", slugify(e.target.value))}
-            className="w-full border border-gray-300 bg-white px-3 py-2 text-lg outline-none focus:border-black"
+            className={`w-full border bg-white px-3 py-2 text-lg outline-none transition-colors ${
+              titleError
+                ? "border-red-500 focus:border-red-600"
+                : "border-gray-300 focus:border-black"
+            }`}
+            placeholder="Enter article title…"
           />
+          {titleError && (
+            <p className="mt-1 text-xs text-red-600 font-semibold">
+              Article title is required — cannot save without a title.
+            </p>
+          )}
         </Field>
         <Field label="Slug">
           <input
@@ -216,13 +301,33 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
             className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
           />
         </Field>
-        <Field label="Dek (subheadline)">
+        <Field
+          label={
+            <span>
+              Description / Dek <span className="text-red-600">*</span>
+            </span>
+          }
+        >
           <textarea
+            ref={dekRef}
             rows={2}
             value={form.dek ?? ""}
-            onChange={(e) => set("dek", e.target.value)}
-            className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
+            onChange={(e) => {
+              set("dek", e.target.value);
+              if (e.target.value.trim() && dekError) setDekError(false);
+            }}
+            className={`w-full border bg-white px-3 py-2 outline-none transition-colors ${
+              dekError
+                ? "border-red-500 focus:border-red-600"
+                : "border-gray-300 focus:border-black"
+            }`}
+            placeholder="Enter a brief description / dek for the article…"
           />
+          {dekError && (
+            <p className="mt-1 text-xs text-red-600 font-semibold">
+              Description is required — cannot save without a description.
+            </p>
+          )}
         </Field>
         <Field label="Body">
           <RichTextEditor
@@ -253,7 +358,9 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
 
       <aside className="space-y-4">
         <div className="border border-gray-200 bg-gray-50 p-4">
-          <div className="text-xs font-black uppercase tracking-widest text-black mb-3">Publish</div>
+          <div className="text-xs font-black uppercase tracking-widest text-black mb-3">
+            Publish
+          </div>
           <label className="mb-2 block text-sm">
             Status
             <select
@@ -282,7 +389,13 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
             />
             Featured on home
           </label>
-          <Field label="Category">
+          <Field
+            label={
+              <span>
+                Category <span className="text-red-600">*</span>
+              </span>
+            }
+          >
             <select
               value={categoryId ?? ""}
               onChange={(e) => {
@@ -291,12 +404,14 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
                 if (val && categoryError) setCategoryError(false);
               }}
               className={`w-full border bg-white px-2 py-1.5 ${
-                categoryError ? "border-red-500 focus:border-red-600" : "border-gray-300 focus:border-black"
+                categoryError
+                  ? "border-red-500 focus:border-red-600"
+                  : "border-gray-300 focus:border-black"
               }`}
               aria-invalid={categoryError || undefined}
               aria-describedby={categoryError ? "category-error" : undefined}
             >
-              <option value="">— None —</option>
+              <option value="">— Select Category —</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -310,17 +425,34 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
             )}
           </Field>
         </div>
-        <div className="border border-gray-200 bg-gray-50 p-4">
-          <div className="text-xs font-black uppercase tracking-widest text-black mb-3">Hero Image</div>
+        <div
+          ref={heroBoxRef}
+          className={`border p-4 transition-colors ${
+            heroImageError
+              ? "border-red-500 bg-red-50/40"
+              : "border-gray-200 bg-gray-50"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-black uppercase tracking-widest text-black">
+              Hero Image <span className="text-red-600">*</span>
+            </div>
+            {heroImageError && (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-red-600">
+                Required
+              </span>
+            )}
+          </div>
           {form.hero_image_hd && (
             <div className="relative mb-2 group">
-              <img src={form.hero_image_hd} alt="" className="w-full block" />
+              <img src={normalizeMediaUrl(form.hero_image_hd)} alt="" className="w-full block" />
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   set("hero_image_hd", "");
                   set("hero_image_lq", "");
+                  setHeroImageError(true);
                   toast.success("Hero image removed.");
                 }}
                 className="absolute top-2 right-2 z-20 bg-black/80 hover:bg-black text-white text-xs font-bold uppercase rounded px-2 py-1 flex items-center gap-1 shadow"
@@ -334,7 +466,7 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
             type="file"
             accept="image/*"
             onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
-            className="w-full"
+            className="w-full text-xs"
           />
           {isUploading && (
             <div className="text-sm text-black mt-2">
@@ -344,23 +476,35 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
           )}
           {typeof progressPct === "number" && progressPct > 0 && (
             <div className="mt-2 w-full overflow-hidden rounded-full bg-gray-200 h-2">
-              <div className="h-full bg-black transition-all" style={{ width: `${Math.max(0, Math.min(100, progressPct))}%` }} />
+              <div
+                className="h-full bg-black transition-all"
+                style={{ width: `${Math.max(0, Math.min(100, progressPct))}%` }}
+              />
             </div>
           )}
           <input
             placeholder="…or paste image URL"
             value={form.hero_image_hd ?? ""}
             onChange={(e) => {
-              set("hero_image_hd", e.target.value);
-              set("hero_image_lq", e.target.value);
+              const val = e.target.value;
+              set("hero_image_hd", val);
+              set("hero_image_lq", val);
+              if (val.trim() && heroImageError) setHeroImageError(false);
             }}
-            className="mt-2 w-full border border-gray-300 bg-white px-2 py-1.5 text-xs"
+            className={`mt-2 w-full border bg-white px-2 py-1.5 text-xs outline-none ${
+              heroImageError
+                ? "border-red-500 focus:border-red-600"
+                : "border-gray-300 focus:border-black"
+            }`}
           />
+          {heroImageError && (
+            <p className="mt-2 text-xs text-red-600 font-semibold">
+              Hero image is required — please upload an image or paste an image URL.
+            </p>
+          )}
         </div>
 
-        {err && (
-          <div className="border border-red-500 bg-red-50 p-3 text-xs">{err}</div>
-        )}
+        {err && <div className="border border-red-500 bg-red-50 p-3 text-xs">{err}</div>}
         <button
           disabled={saving || isUploading || (typeof progressPct === "number" && progressPct < 100)}
           className="bg-black text-white hover:bg-gray-800 w-full py-3 font-black uppercase tracking-widest disabled:opacity-60"
@@ -370,7 +514,11 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
               : undefined
           }
         >
-          {saving ? "Saving…" : (isUploading || (typeof progressPct === "number" && progressPct < 100)) ? `Uploading… ${typeof progressPct === "number" ? progressPct + "%" : ""}` : "Save Article"}
+          {saving
+            ? "Saving…"
+            : isUploading || (typeof progressPct === "number" && progressPct < 100)
+              ? `Uploading… ${typeof progressPct === "number" ? progressPct + "%" : ""}`
+              : "Save Article"}
         </button>
       </aside>
     </form>
@@ -397,14 +545,20 @@ async function maybeCompressImage(file: File) {
     ctx.drawImage(bitmap, 0, 0, width, height);
 
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), file.type === "image/png" ? "image/png" : "image/jpeg", 0.88),
+      canvas.toBlob(
+        (b) => resolve(b),
+        file.type === "image/png" ? "image/png" : "image/jpeg",
+        0.88,
+      ),
     );
     if (!blob) return file;
     if (blob.size >= file.size) return file;
 
     const baseName = file.name.replace(/\.[^.]+$/, "");
     const ext = file.type === "image/png" ? "png" : "jpg";
-    return new File([blob], `${baseName}.${ext}`, { type: file.type === "image/png" ? "image/png" : "image/jpeg" });
+    return new File([blob], `${baseName}.${ext}`, {
+      type: file.type === "image/png" ? "image/png" : "image/jpeg",
+    });
   } catch {
     return file;
   }
@@ -459,7 +613,7 @@ async function uploadWithProgress(
   });
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <label className="block">
       <div className="text-xs font-black uppercase tracking-widest text-black mb-1.5">{label}</div>
@@ -475,13 +629,39 @@ function RichTextEditor({
 }: {
   value: string;
   onChange: (value: string) => void;
-  uploadingState?: { uploading: boolean; progress: number | null; setUploading: (v: boolean) => void; setProgress: (p: number | null) => void };
+  uploadingState?: {
+    uploading: boolean;
+    progress: number | null;
+    setUploading: (v: boolean) => void;
+    setProgress: (p: number | null) => void;
+  };
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const pendingUploadsRef = useRef(0);
   const perFileProgressRef = useRef<Map<number, number>>(new Map());
   const uploadTokenRef = useRef(0);
   const attachedBtnsRef = useRef<Set<HTMLButtonElement>>(new Set());
+
+  const savedRangeRef = useRef<Range | null>(null);
+  const [linkModal, setLinkModal] = useState<{
+    isOpen: boolean;
+    text: string;
+    url: string;
+    openInNewTab: boolean;
+  }>({
+    isOpen: false,
+    text: "",
+    url: "",
+    openInNewTab: true,
+  });
+  const [videoModal, setVideoModal] = useState<{ isOpen: boolean; url: string }>({
+    isOpen: false,
+    url: "",
+  });
+  const [socialModal, setSocialModal] = useState<{ isOpen: boolean; url: string }>({
+    isOpen: false,
+    url: "",
+  });
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -537,7 +717,8 @@ function RichTextEditor({
         // Ensure row and button
         const row = block.querySelector<HTMLElement>(":scope > .art-inline-row");
         if (!row) buildBottomRow(block);
-        else if (!row.querySelector("button.art-inline-remove")) row.appendChild(makeRemoveBtn(block));
+        else if (!row.querySelector("button.art-inline-remove"))
+          row.appendChild(makeRemoveBtn(block));
         return;
       }
 
@@ -604,16 +785,14 @@ function RichTextEditor({
 
     function inventoryAll() {
       const items = Array.from(
-        editor.querySelectorAll<HTMLElement>(
-          "figure, video, iframe, a:has(img, video, iframe)",
-        ),
+        editor.querySelectorAll<HTMLElement>("figure, video, iframe, a:has(img, video, iframe)"),
       );
       items.forEach(ensureBlockUi);
     }
 
     function removeBlock(block: HTMLElement) {
       // Remove the full art-block wrapper (figure) - media + row go together
-      const toRemove = block.closest<HTMLElement>("[data-art-block=\"1\"]") || block;
+      const toRemove = block.closest<HTMLElement>('[data-art-block="1"]') || block;
       const prevEl = toRemove.previousElementSibling;
       const nextEl = toRemove.nextElementSibling;
       const prevText = toRemove.previousSibling;
@@ -632,8 +811,10 @@ function RichTextEditor({
       };
       if (isEmptyParagraph(prevEl)) prevEl.remove();
       if (isEmptyParagraph(nextEl)) nextEl.remove();
-      if (prevText && prevText.nodeType === 3 && (prevText.textContent || "").trim() === "") prevText.remove();
-      if (nextText && nextText.nodeType === 3 && (nextText.textContent || "").trim() === "") nextText.remove();
+      if (prevText && prevText.nodeType === 3 && (prevText.textContent || "").trim() === "")
+        prevText.remove();
+      if (nextText && nextText.nodeType === 3 && (nextText.textContent || "").trim() === "")
+        nextText.remove();
       // Ensure editor has a minimal trailing <p> for typing
       const last = editor.lastElementChild;
       if (!last || last.tagName !== "P") {
@@ -651,7 +832,9 @@ function RichTextEditor({
       if (pendingSync) return;
       pendingSync = window.setTimeout(() => {
         pendingSync = 0;
-        try { syncValue(); } catch {}
+        try {
+          syncValue();
+        } catch {}
       }, 120);
     }
     const io = new MutationObserver(() => {
@@ -947,51 +1130,110 @@ function RichTextEditor({
   function figureVideoHtml(src: string, label?: string) {
     const safeSrc = String(src).replace(/"/g, "&quot;");
     return (
-      '<figure class="my-8 w-full max-w-none">' +
-      '<div class="w-full overflow-hidden rounded border border-gray-200 bg-black">' +
-      `<video src="${safeSrc}" class="h-full w-full" controls playsinline preload="metadata" poster=""></video>` +
+      '<figure class="my-6 flex flex-col items-center justify-center w-full mx-auto text-center">' +
+      '<div class="w-full max-w-[580px] mx-auto overflow-hidden rounded border border-gray-200 bg-transparent shadow-sm">' +
+      `<video src="${safeSrc}" class="w-full h-auto max-h-[500px]" controls playsinline preload="metadata" poster=""></video>` +
       "</div>" +
       "</figure><p><br></p>"
     );
   }
 
   function insertLink() {
+    editorRef.current?.focus();
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.getRangeAt(0).collapsed || !editorRef.current?.contains(sel.anchorNode)) {
-      toast.info("Select some text first, then click Add link to insert a hyperlink.");
-      editorRef.current?.focus();
+    let selectedText = "";
+    let existingUrl = "";
+
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      const range = sel.getRangeAt(0);
+      savedRangeRef.current = range.cloneRange();
+      selectedText = range.toString();
+
+      let node: Node | null = sel.anchorNode;
+      while (node && node !== editorRef.current) {
+        if (node.nodeType === 1 && (node as HTMLElement).tagName === "A") {
+          existingUrl = (node as HTMLAnchorElement).href || "";
+          break;
+        }
+        node = node.parentNode;
+      }
+    } else {
+      savedRangeRef.current = null;
+    }
+
+    setLinkModal({
+      isOpen: true,
+      text: selectedText,
+      url: existingUrl || "",
+      openInNewTab: true,
+    });
+  }
+
+  function handleApplyLink() {
+    const rawUrl = linkModal.url.trim();
+    if (!rawUrl) {
+      toast.error("Please enter a link URL.");
       return;
     }
-    const currentAnchor = (() => {
-      try {
-        let node: Node | null = sel.anchorNode;
-        while (node && node !== editorRef.current) {
-          if (node.nodeType === 1 && (node as HTMLElement).tagName === "A") {
-            return (node as HTMLAnchorElement).href || "";
+    let finalUrl = rawUrl;
+    if (
+      !/^https?:\/\//i.test(finalUrl) &&
+      !/^mailto:/i.test(finalUrl) &&
+      !/^tel:/i.test(finalUrl) &&
+      !finalUrl.startsWith("/") &&
+      !finalUrl.startsWith("#")
+    ) {
+      finalUrl = `https://${finalUrl}`;
+    }
+
+    // Restore saved selection
+    if (savedRangeRef.current) {
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(savedRangeRef.current);
+    }
+    editorRef.current?.focus();
+
+    const currentSelectedText = savedRangeRef.current?.toString() || "";
+    const displayText = linkModal.text.trim();
+
+    if (currentSelectedText && (!displayText || displayText === currentSelectedText)) {
+      run("createLink", finalUrl);
+      const anchors = editorRef.current?.querySelectorAll?.("a") ?? [];
+      anchors.forEach((aEl) => {
+        const a = aEl as HTMLAnchorElement;
+        if (!a.href) return;
+        const href = a.getAttribute("href") || "";
+        if (href && href.trim() !== "#") {
+          if (linkModal.openInNewTab) {
+            a.setAttribute("target", "_blank");
+            a.setAttribute("rel", "noreferrer noopener nofollow");
+          } else {
+            a.removeAttribute("target");
+            a.removeAttribute("rel");
           }
-          node = node.parentNode;
+          a.setAttribute("data-link-applied", "1");
+          a.classList.add("art-editor-link");
+          a.style.color = "#1d4ed8";
+          a.style.textDecoration = "underline";
+          a.style.fontWeight = "600";
         }
-      } catch {}
-      return "";
-    })();
-    const url = window.prompt("Link URL daalein (https://...):", currentAnchor || "https://");
-    if (url == null) return;
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    run("createLink", trimmed);
-    const anchors = editorRef.current?.querySelectorAll?.("a") ?? [];
-    anchors.forEach((aEl) => {
-      const a = aEl as HTMLAnchorElement;
-      if (a.getAttribute("data-link-applied") === "1") return;
-      if (!a.href) return;
-      const href = a.getAttribute("href") || "";
-      if (href && href.trim() !== "#" && !a.getAttribute("target")) {
-        a.setAttribute("target", "_blank");
-        a.setAttribute("rel", "noreferrer noopener nofollow");
-        a.setAttribute("data-link-applied", "1");
-      }
-    });
+      });
+    } else {
+      const label = displayText || finalUrl;
+      const targetAttr = linkModal.openInNewTab
+        ? ' target="_blank" rel="noreferrer noopener nofollow"'
+        : "";
+      const safeHref = finalUrl.replace(/"/g, "&quot;");
+      const safeLabel = label.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const aHtml = `<a href="${safeHref}"${targetAttr} class="art-editor-link" data-link-applied="1" style="color: #1d4ed8; text-decoration: underline; font-weight: 600;">${safeLabel}</a>`;
+      insertHtmlAtCursor(aHtml);
+    }
+
     syncValue();
+    setLinkModal({ isOpen: false, text: "", url: "", openInNewTab: true });
+    savedRangeRef.current = null;
+    toast.success("Link added successfully!");
   }
 
   function removeLink() {
@@ -1049,8 +1291,10 @@ function RichTextEditor({
           );
           perFileProgressRef.current.set(o.token, 100);
           recomputeAggregateProgress();
-          o.done = { url: data.imageUrl, label: "" };
-          toast.success(`${fileIsVideo(o.file) ? "Video" : "Image"} uploaded (${o.index + 1}/${order.length})`);
+          o.done = { url: normalizeMediaUrl(data.imageUrl), label: "" };
+          toast.success(
+            `${fileIsVideo(o.file) ? "Video" : "Image"} uploaded (${o.index + 1}/${order.length})`,
+          );
         } catch (e: any) {
           o.err = e;
         } finally {
@@ -1082,16 +1326,34 @@ function RichTextEditor({
 
   function insertVideoEmbed() {
     editorRef.current?.focus();
-    const url = window.prompt(
-      "Paste a public video URL (YouTube or Vimeo iframe embed URLs are also accepted):",
-      "https://www.youtube.com/watch?v=",
-    );
-    if (!url) return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+    } else {
+      savedRangeRef.current = null;
+    }
+    setVideoModal({
+      isOpen: true,
+      url: "",
+    });
+  }
+
+  function handleApplyVideo() {
+    const url = videoModal.url.trim();
+    if (!url) {
+      toast.error("Please enter a video URL.");
+      return;
+    }
     const embed = (() => {
       try {
-        const u = new URL(url.trim());
+        const u = new URL(url);
         const host = u.hostname.replace(/^www\./, "");
-        if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com" || host === "youtu.be") {
+        if (
+          host === "youtube.com" ||
+          host === "m.youtube.com" ||
+          host === "music.youtube.com" ||
+          host === "youtu.be"
+        ) {
           const videoId = (() => {
             if (host === "youtu.be") return u.pathname.split("/").filter(Boolean)[0] || null;
             if (u.pathname === "/watch") return u.searchParams.get("v");
@@ -1116,7 +1378,6 @@ function RichTextEditor({
             title: "Vimeo video",
           };
         }
-        // Explicit public embed iframe URLs (whitelisted)
         if (host === "youtube-nocookie.com" || host === "player.vimeo.com") {
           return {
             tag: "iframe",
@@ -1133,24 +1394,48 @@ function RichTextEditor({
       toast.error("This video URL is not supported. Please paste a valid YouTube or Vimeo URL.");
       return;
     }
+    if (savedRangeRef.current) {
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(savedRangeRef.current);
+    }
+    editorRef.current?.focus();
     const safeSrc = embed.src.replace(/"/g, "&quot;");
     const safeTitle = (embed.title || "Video").replace(/"/g, "&quot;");
+    const isVertical = /\/shorts\//i.test(url) || /tiktok\.com/i.test(url) || /\/reel\//i.test(url);
+    const aspectClass = isVertical ? "aspect-[9/16] max-w-[320px]" : "aspect-video max-w-[500px]";
     const html =
-      '<figure class="my-8 w-full max-w-none">' +
-      '<div class="aspect-video w-full overflow-hidden rounded border border-gray-200 bg-black">' +
-      `<iframe src="${safeSrc}" title="${safeTitle}" class="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
+      '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
+      `<div class="${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">` +
+      `<iframe src="${safeSrc}" title="${safeTitle}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
       "</div></figure><p><br></p>";
     insertHtmlAtCursor(html);
+    setVideoModal({ isOpen: false, url: "" });
+    savedRangeRef.current = null;
+    toast.success("Video embed inserted!");
   }
 
   function insertPostEmbed() {
     editorRef.current?.focus();
-    const url = window.prompt(
-      "Paste a public social post URL (X / Twitter, Instagram, TikTok, Facebook, YouTube):",
-      "",
-    );
-    if (!url) return;
-    const normalized = url.trim();
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+    } else {
+      savedRangeRef.current = null;
+    }
+    setSocialModal({
+      isOpen: true,
+      url: "",
+    });
+  }
+
+  function handleApplySocial() {
+    const url = socialModal.url.trim();
+    if (!url) {
+      toast.error("Please enter a social post URL.");
+      return;
+    }
+    const normalized = url;
     let parsed: URL | null = null;
     try {
       parsed = new URL(normalized);
@@ -1161,16 +1446,30 @@ function RichTextEditor({
     const host = parsed.hostname.replace(/^www\./, "");
     const permalink = parsed.toString().replace(/"/g, "&quot;");
 
+    if (savedRangeRef.current) {
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(savedRangeRef.current);
+    }
+    editorRef.current?.focus();
+
     // X / Twitter
-    if (host === "twitter.com" || host === "x.com" || host === "mobile.twitter.com" || host === "m.x.com") {
+    if (
+      host === "twitter.com" ||
+      host === "x.com" ||
+      host === "mobile.twitter.com" ||
+      host === "m.x.com"
+    ) {
       const cleanPath = parsed.pathname.replace(/\/+$/, "") || "/";
       const safePermalink = `https://x.com${cleanPath}`.replace(/"/g, "&quot;");
       const html =
-        '<figure class="my-8 w-full max-w-none">' +
-        `<blockquote class="twitter-tweet" data-lang="en" data-dnt="true" data-embed-permalink="${safePermalink}">` +
+        '<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto max-w-full text-center">' +
+        `<blockquote class="twitter-tweet mx-auto" data-align="center" data-lang="en" data-dnt="true" data-embed-permalink="${safePermalink}">` +
         `<p lang="en" dir="ltr"><a href="${safePermalink}">View post on X / Twitter</a></p>` +
         "</blockquote></figure><p><br></p>";
       insertHtmlAtCursor(html);
+      setSocialModal({ isOpen: false, url: "" });
+      savedRangeRef.current = null;
       toast.success("X / Twitter post embedded.");
       return;
     }
@@ -1181,20 +1480,27 @@ function RichTextEditor({
       const valid =
         pathOnly.startsWith("/p/") ||
         pathOnly.startsWith("/reel/") ||
+        pathOnly.startsWith("/reels/") ||
         pathOnly.startsWith("/tv/") ||
         pathOnly.startsWith("/stories/");
       if (!valid) {
         toast.error("This Instagram link is not valid. Please paste a post, reel, or story URL.");
         return;
       }
-      const safePermalink = `https://www.instagram.com${pathOnly}`.replace(/"/g, "&quot;");
+      const isReel = pathOnly.startsWith("/reel/") || pathOnly.startsWith("/reels/");
+      const cleanLink = `https://www.instagram.com${pathOnly}`.replace(/\/+$/, "");
+      const maxW = isReel ? "max-w-[340px]" : "max-w-[440px]";
+      const height = isReel ? "580px" : "480px";
+      const title = isReel ? "Instagram Reel" : "Instagram Post";
       const html =
-        '<figure class="my-8 w-full max-w-none">' +
-        `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${safePermalink}" data-instgrm-version="14" data-embed-type="instagram" data-embed-permalink="${safePermalink}">` +
-        `<a href="${safePermalink}">View post on Instagram</a>` +
-        "</blockquote></figure><p><br></p>";
+        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
+        `<div class="w-full ${maxW} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+        `<iframe src="${cleanLink}/embed/" title="${title}" class="w-full block border-0 bg-white" style="height: ${height}; min-height: ${height}; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe>` +
+        "</div></figure><p><br></p>";
       insertHtmlAtCursor(html);
-      toast.success("Instagram post embedded.");
+      setSocialModal({ isOpen: false, url: "" });
+      savedRangeRef.current = null;
+      toast.success(isReel ? "Instagram Reel embedded." : "Instagram post embedded.");
       return;
     }
 
@@ -1202,26 +1508,58 @@ function RichTextEditor({
     if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
       const path = parsed.pathname.replace(/\/+$/, "");
       const safePermalink = `https://www.tiktok.com${path}`.replace(/"/g, "&quot;");
-      const html =
-        '<figure class="my-8 w-full max-w-none">' +
-        `<blockquote class="tiktok-embed" cite="${safePermalink}" data-video-id="" data-embed-type="tiktok" data-embed-permalink="${safePermalink}">` +
-        `<section><a target="_blank" rel="noopener noreferrer nofollow" href="${safePermalink}">View post on TikTok</a></section>` +
-        "</blockquote></figure><p><br></p>";
+      const directId =
+        parsed.pathname.match(/\/video\/(\d+)/)?.[1] ||
+        parsed.pathname.match(/\/v\/(\d+)/)?.[1] ||
+        null;
+      const html = directId
+        ? '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
+          '<div class="w-full max-w-[325px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">' +
+          `<iframe src="https://www.tiktok.com/embed/v2/${directId}" title="TikTok video" class="w-full block border-0 bg-white" style="height: 580px; min-height: 580px; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe>` +
+          "</div></figure><p><br></p>"
+        : '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
+          `<blockquote class="tiktok-embed mx-auto" cite="${safePermalink}" data-video-id="" data-embed-type="tiktok" data-embed-permalink="${safePermalink}" style="max-width: 325px; min-width: 260px; margin: 0 auto;">` +
+          `<section><a target="_blank" rel="noopener noreferrer nofollow" href="${safePermalink}">View post on TikTok</a></section>` +
+          "</blockquote></figure><p><br></p>";
       insertHtmlAtCursor(html);
+      setSocialModal({ isOpen: false, url: "" });
+      savedRangeRef.current = null;
       toast.success("TikTok post embedded.");
       return;
     }
 
     // Facebook / FB post or video
-    if (host === "facebook.com" || host.endsWith(".facebook.com") || host === "fb.watch" || host === "fb.com") {
+    if (
+      host === "facebook.com" ||
+      host.endsWith(".facebook.com") ||
+      host === "fb.watch" ||
+      host === "fb.com"
+    ) {
       const safePermalink = permalink;
+      const isVideo =
+        safePermalink.includes("/videos/") ||
+        safePermalink.includes("/watch") ||
+        safePermalink.includes("fb.watch") ||
+        safePermalink.includes("/reel/");
+      const isReel = safePermalink.includes("/reel/") || safePermalink.includes("/reels/");
+      const fbHref = encodeURIComponent(safePermalink);
+      const iframeSrc = isVideo
+        ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto`
+        : `https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=auto`;
+      const containerClass = isReel
+        ? "aspect-[9/16] max-w-[320px]"
+        : isVideo
+          ? "aspect-video max-w-[480px]"
+          : "max-w-[440px]";
       const html =
-        '<figure class="my-8 w-full max-w-none">' +
-        `<blockquote class="fb-post" data-href="${safePermalink}" data-width="500" data-show-text="true" data-embed-type="facebook" data-embed-permalink="${safePermalink}">` +
-        `<a href="${safePermalink}">View post on Facebook</a>` +
-        "</blockquote></figure><p><br></p>";
+        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
+        `<div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">` +
+        `<iframe src="${iframeSrc}" width="100%" height="${isReel || isVideo ? "100%" : "480"}" style="border: none; overflow: hidden; width: 100%; height: ${isReel || isVideo ? "100%" : "480px"}; min-height: ${isReel || isVideo ? "100%" : "250px"}; background: transparent;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen title="Facebook content" class="w-full mx-auto block bg-transparent"></iframe>` +
+        "</div></figure><p><br></p>";
       insertHtmlAtCursor(html);
-      toast.success("Facebook post embedded.");
+      setSocialModal({ isOpen: false, url: "" });
+      savedRangeRef.current = null;
+      toast.success(isVideo ? "Facebook video embedded." : "Facebook post embedded.");
       return;
     }
 
@@ -1242,21 +1580,29 @@ function RichTextEditor({
         return null;
       })();
       if (!videoId) {
-        toast.error("This YouTube URL is not valid. Please use the Insert video URL button instead.");
+        toast.error(
+          "This YouTube URL is not valid. Please use the Insert video URL button instead.",
+        );
         return;
       }
       const src = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`.replace(/"/g, "&quot;");
+      const isVertical = parsed.pathname.startsWith("/shorts/") || parsed.pathname.includes("/shorts/");
+      const aspectClass = isVertical ? "aspect-[9/16] max-w-[320px]" : "aspect-video max-w-[500px]";
       const html =
-        '<figure class="my-8 w-full max-w-none">' +
-        '<div class="aspect-video w-full overflow-hidden rounded border border-gray-200 bg-black">' +
-        `<iframe src="${src}" title="YouTube video" class="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
+        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
+        `<div class="${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">` +
+        `<iframe src="${src}" title="YouTube video" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
         "</div></figure><p><br></p>";
       insertHtmlAtCursor(html);
+      setSocialModal({ isOpen: false, url: "" });
+      savedRangeRef.current = null;
       toast.success("YouTube video embedded.");
       return;
     }
 
-    toast.error("This post URL is not supported yet. Supported platforms: X / Twitter, Instagram, TikTok, Facebook, YouTube.");
+    toast.error(
+      "This post URL is not supported yet. Supported platforms: X / Twitter, Instagram, TikTok, Facebook, YouTube.",
+    );
   }
 
   return (
@@ -1277,7 +1623,11 @@ function RichTextEditor({
 
         <ToolbarGroup>
           <ToolbarButton label="Bullets" icon={List} onClick={() => run("insertUnorderedList")} />
-          <ToolbarButton label="Numbered" icon={ListOrdered} onClick={() => run("insertOrderedList")} />
+          <ToolbarButton
+            label="Numbered"
+            icon={ListOrdered}
+            onClick={() => run("insertOrderedList")}
+          />
         </ToolbarGroup>
 
         <ToolbarGroup>
@@ -1286,9 +1636,21 @@ function RichTextEditor({
         </ToolbarGroup>
 
         <ToolbarGroup>
-          <ToolbarButton label="Insert HD image (in article)" icon={ImageIcon} onClick={insertImageInline} />
-          <ToolbarButton label="Insert video URL (YouTube/Vimeo)" icon={VideoIcon} onClick={insertVideoEmbed} />
-          <ToolbarButton label="Embed social post (X/Instagram/TikTok/Facebook)" icon={PostEmbedIcon} onClick={insertPostEmbed} />
+          <ToolbarButton
+            label="Insert HD image (in article)"
+            icon={ImageIcon}
+            onClick={insertImageInline}
+          />
+          <ToolbarButton
+            label="Insert video URL (YouTube/Vimeo)"
+            icon={VideoIcon}
+            onClick={insertVideoEmbed}
+          />
+          <ToolbarButton
+            label="Embed social post (X/Instagram/TikTok/Facebook)"
+            icon={PostEmbedIcon}
+            onClick={insertPostEmbed}
+          />
         </ToolbarGroup>
       </div>
       <div
@@ -1297,17 +1659,265 @@ function RichTextEditor({
         suppressContentEditableWarning
         onInput={syncValue}
         onBlur={syncValue}
-        className="min-h-[420px] w-full px-4 py-4 text-[15px] leading-7 outline-none"
+        className="art-rich-editor min-h-[420px] w-full px-4 py-4 text-[15px] leading-7 outline-none [&_a]:text-blue-600 [&_a]:underline [&_a]:font-semibold hover:[&_a]:text-blue-800"
       />
       <div className="border-t border-gray-200 bg-gray-50 px-3 py-2 text-xs text-muted-foreground">
-        Tip: Select text and use Add link to insert hyperlinks. Use the Image button to upload files or paste a URL — HD images up to 2560px are preserved. Video embed supports YouTube and Vimeo. Use Embed social post to insert posts from X, Instagram, TikTok, and Facebook directly between paragraphs.
+        Tip: Select text and use Add link to insert hyperlinks. Use the Image button to upload files
+        or paste a URL — HD images up to 2560px are preserved. Video embed supports YouTube and
+        Vimeo. Use Embed social post to insert posts from X, Instagram, TikTok, and Facebook
+        directly between paragraphs.
       </div>
+
+      {linkModal.isOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setLinkModal((p) => ({ ...p, isOpen: false }));
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
+                <LinkIcon className="h-4 w-4" /> Insert Hyperlink
+              </h3>
+              <button
+                type="button"
+                onClick={() => setLinkModal((p) => ({ ...p, isOpen: false }))}
+                className="text-gray-400 hover:text-black p-1 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Text to display
+                </label>
+                <input
+                  type="text"
+                  value={linkModal.text}
+                  onChange={(e) => setLinkModal((p) => ({ ...p, text: e.target.value }))}
+                  placeholder="Text that users click on…"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Link URL <span className="text-red-600">*</span>
+                </label>
+                <input
+                  autoFocus
+                  type="url"
+                  value={linkModal.url}
+                  onChange={(e) => setLinkModal((p) => ({ ...p, url: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleApplyLink();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setLinkModal((p) => ({ ...p, isOpen: false }));
+                    }
+                  }}
+                  placeholder="https://example.com"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-gray-700 pt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={linkModal.openInNewTab}
+                  onChange={(e) => setLinkModal((p) => ({ ...p, openInNewTab: e.target.checked }))}
+                  className="rounded border-gray-300"
+                />
+                Open in new tab (recommended)
+              </label>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLinkModal((p) => ({ ...p, isOpen: false }))}
+                className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyLink}
+                className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800"
+              >
+                Insert Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {videoModal.isOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setVideoModal({ isOpen: false, url: "" });
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
+                <VideoIcon className="h-4 w-4" /> Insert Video Embed
+              </h3>
+              <button
+                type="button"
+                onClick={() => setVideoModal({ isOpen: false, url: "" })}
+                className="text-gray-400 hover:text-black p-1 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                Video URL (YouTube or Vimeo) <span className="text-red-600">*</span>
+              </label>
+              <input
+                autoFocus
+                type="url"
+                value={videoModal.url}
+                onChange={(e) => setVideoModal({ isOpen: true, url: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleApplyVideo();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setVideoModal({ isOpen: false, url: "" });
+                  }
+                }}
+                placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
+              />
+              <p className="text-xs text-gray-500">
+                YouTube watch links, Shorts, and Vimeo URLs will be inserted as responsive 16:9 videos.
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setVideoModal({ isOpen: false, url: "" })}
+                className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyVideo}
+                className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800"
+              >
+                Insert Video
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {socialModal.isOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setSocialModal({ isOpen: false, url: "" });
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
+                <PostEmbedIcon className="h-4 w-4" /> Embed Social Post
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSocialModal({ isOpen: false, url: "" })}
+                className="text-gray-400 hover:text-black p-1 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                Post URL <span className="text-red-600">*</span>
+              </label>
+              <input
+                autoFocus
+                type="url"
+                value={socialModal.url}
+                onChange={(e) => setSocialModal({ isOpen: true, url: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleApplySocial();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setSocialModal({ isOpen: false, url: "" });
+                  }
+                }}
+                placeholder="https://x.com/... or https://www.instagram.com/p/..."
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
+              />
+              <p className="text-xs text-gray-500">
+                Supports posts and reels from X (Twitter), Instagram, TikTok, and Facebook.
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSocialModal({ isOpen: false, url: "" })}
+                className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplySocial}
+                className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800"
+              >
+                Embed Post
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function ToolbarGroup({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-1 rounded-md border border-gray-200 bg-white p-1">{children}</div>;
+  return (
+    <div className="flex flex-wrap items-center gap-1 rounded-md border border-gray-200 bg-white p-1">
+      {children}
+    </div>
+  );
 }
 
 function ToolbarButton({

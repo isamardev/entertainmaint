@@ -9,7 +9,11 @@ export const Route = createFileRoute("/admin/users")({ component: UsersAdmin });
 function UsersAdmin() {
   const { isSuperAdmin } = useAuth();
   const qc = useQueryClient();
-  const { data = [], isLoading, error } = useQuery({
+  const {
+    data = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -75,34 +79,32 @@ function UsersAdmin() {
           </div>
         </div>
       ) : (
-      <div className="border border-gray-200">
-        {[...byUser.entries()].map(([uid, u]) => (
-          <div
-            key={uid}
-            className="flex flex-wrap items-center gap-3 border-b border-gray-200 p-3 last:border-0"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold">{u.profile?.display_name ?? uid.slice(0, 8)}</div>
-              <div className="text-xs text-black truncate">{uid}</div>
+        <div className="border border-gray-200">
+          {[...byUser.entries()].map(([uid, u]) => (
+            <div
+              key={uid}
+              className="flex flex-wrap items-center gap-3 border-b border-gray-200 p-3 last:border-0"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold">{u.profile?.display_name ?? uid.slice(0, 8)}</div>
+                <div className="text-xs text-black truncate">{uid}</div>
+              </div>
+              {(["reader", "admin", "super_admin"] as const).map((r) => {
+                const on = u.roles.includes(r);
+                return (
+                  <button
+                    key={r}
+                    onClick={() => setRole(uid, r, !on)}
+                    className={`px-2 py-1 text-[0.65rem] font-black uppercase tracking-widest ${on ? "bg-black text-white" : "border border-gray-300 text-black hover:border-black"}`}
+                  >
+                    {r.replace("_", " ")}
+                  </button>
+                );
+              })}
             </div>
-            {(["reader", "admin", "super_admin"] as const).map((r) => {
-              const on = u.roles.includes(r);
-              return (
-                <button
-                  key={r}
-                  onClick={() => setRole(uid, r, !on)}
-                  className={`px-2 py-1 text-[0.65rem] font-black uppercase tracking-widest ${on ? "bg-black text-white" : "border border-gray-300 text-black hover:border-black"}`}
-                >
-                  {r.replace("_", " ")}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-        {byUser.size === 0 && (
-          <div className="p-8 text-center text-black">No users yet.</div>
-        )}
-      </div>
+          ))}
+          {byUser.size === 0 && <div className="p-8 text-center text-black">No users yet.</div>}
+        </div>
       )}
       {!isLoading && !error && (
         <p className="text-xs text-black mt-4">Click a role tag to toggle it for that user.</p>

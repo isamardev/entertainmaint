@@ -21,7 +21,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Entertainment Trends — Celebrity, TV, Music, Style, Royals, Sports" },
-      { name: "description", content: "Breaking entertainment news updated all day — celebrity, movies & TV, music, style, royals, sports." },
+      {
+        name: "description",
+        content:
+          "Breaking entertainment news updated all day — celebrity, movies & TV, music, style, royals, sports.",
+      },
     ],
     links: [{ rel: "canonical", href: "/" }],
   }),
@@ -48,39 +52,43 @@ function Home() {
   const chunks: Array<{
     large: Article | undefined;
     grid: Article[];
-    split: { large: Article | undefined; top: Article | undefined; bottom: Article | undefined } | undefined;
+    split:
+      | { large: Article | undefined; top: Article | undefined; bottom: Article | undefined }
+      | undefined;
   }> = [];
-  
+
   let i = 0;
   while (i < articles.length) {
     const chunk: any = {};
-    
+
     // First: Large article
     chunk.large = articles[i++];
-    
+
     // Next: 3 for grid
     chunk.grid = [];
     for (let j = 0; j < 3 && i < articles.length; j++) {
       chunk.grid.push(articles[i++]);
     }
-    
+
     // Next: 3 for split layout
     if (i + 2 < articles.length) {
       chunk.split = {
         large: articles[i++],
         top: articles[i++],
-        bottom: articles[i++]
+        bottom: articles[i++],
       };
     } else {
       chunk.split = undefined;
     }
-    
+
     chunks.push(chunk);
   }
 
   return (
     <>
-      <Helmet><title>Entertainment Trends — The Pulse of Pop Culture</title></Helmet>
+      <Helmet>
+        <title>Entertainment Trends — The Pulse of Pop Culture</title>
+      </Helmet>
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
@@ -124,7 +132,9 @@ function Home() {
                               article={article}
                               horizontal
                               size="sm"
-                              imageOverride={sectionIndex % 2 !== 0 ? articleImage(article, true) : undefined}
+                              imageOverride={
+                                sectionIndex % 2 !== 0 ? articleImage(article, true) : undefined
+                              }
                             />
                             {articleIndex < section.list.length - 1 && (
                               <div className="mt-4 border-b border-gray-400" aria-hidden="true" />
@@ -190,9 +200,27 @@ function Home() {
                   </div>
                 ))}
 
-                {chunks.flatMap(c => [c.large, ...c.grid, c.split?.large, c.split?.top, c.split?.bottom]).filter(Boolean).length < articles.length && (
+                {chunks
+                  .flatMap((c) => [
+                    c.large,
+                    ...c.grid,
+                    c.split?.large,
+                    c.split?.top,
+                    c.split?.bottom,
+                  ])
+                  .filter(Boolean).length < articles.length && (
                   <MoreStories
-                    articles={articles.slice(chunks.flatMap(c => [c.large, ...c.grid, c.split?.large, c.split?.top, c.split?.bottom]).filter(Boolean).length)}
+                    articles={articles.slice(
+                      chunks
+                        .flatMap((c) => [
+                          c.large,
+                          ...c.grid,
+                          c.split?.large,
+                          c.split?.top,
+                          c.split?.bottom,
+                        ])
+                        .filter(Boolean).length,
+                    )}
                   />
                 )}
               </>
@@ -250,7 +278,9 @@ function FeaturedArticle({
           {article.title}
         </h3>
         {article.dek && !hideDek && (
-          <p className="mt-2 text-sm md:text-sm text-muted-foreground hidden md:block">{article.dek}</p>
+          <p className="mt-2 text-sm md:text-sm text-muted-foreground hidden md:block">
+            {article.dek}
+          </p>
         )}
       </Link>
       <div className="mt-10 border-b border-gray-400" aria-hidden="true" />
@@ -285,7 +315,10 @@ function ArticleGrid({
                   imageOverride={useAltImage ? articleImage(a, true) : undefined}
                 />
                 {i < articles.length - 1 && (
-                  <div className="mt-8 block border-b border-gray-400 sm:hidden" aria-hidden="true" />
+                  <div
+                    className="mt-8 block border-b border-gray-400 sm:hidden"
+                    aria-hidden="true"
+                  />
                 )}
               </div>
             ))}
@@ -390,12 +423,16 @@ function SplitArticleLayout({
       >
         {largeOnLeft ? (
           <>
-            <div className="flex h-full min-h-0 flex-col md:pr-5 md:border-r md:border-gray-400">{largeBlock}</div>
+            <div className="flex h-full min-h-0 flex-col md:pr-5 md:border-r md:border-gray-400">
+              {largeBlock}
+            </div>
             <div className="flex h-full min-h-0 flex-col md:pl-5">{smallStack}</div>
           </>
         ) : (
           <>
-            <div className="flex h-full min-h-0 flex-col md:pr-5 md:border-r md:border-gray-400">{smallStack}</div>
+            <div className="flex h-full min-h-0 flex-col md:pr-5 md:border-r md:border-gray-400">
+              {smallStack}
+            </div>
             <div className="flex h-full min-h-0 flex-col md:pl-5">{largeBlock}</div>
           </>
         )}

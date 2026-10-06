@@ -12,10 +12,15 @@ export const Route = createFileRoute("/category/$slug")({
     return { category: cat };
   },
   head: ({ loaderData }) => ({
-    meta: loaderData ? [
-      { title: `${loaderData.category.name} — Entertainment Trends` },
-      { name: "description", content: `Latest ${loaderData.category.name} news on Entertainment Trends.` },
-    ] : [{ title: "Category — Entertainment Trends" }],
+    meta: loaderData
+      ? [
+          { title: `${loaderData.category.name} — Entertainment Trends` },
+          {
+            name: "description",
+            content: `Latest ${loaderData.category.name} news on Entertainment Trends.`,
+          },
+        ]
+      : [{ title: "Category — Entertainment Trends" }],
     links: loaderData ? [{ rel: "canonical", href: `/category/${loaderData.category.slug}` }] : [],
   }),
   component: CategoryPage,
@@ -25,7 +30,11 @@ export const Route = createFileRoute("/category/$slug")({
 
 function LargeCard({ article }: { article: Article }) {
   return (
-    <Link to="/article/$slug" params={{ slug: article.slug }} className="group flex h-full w-full flex-col">
+    <Link
+      to="/article/$slug"
+      params={{ slug: article.slug }}
+      className="group flex h-full w-full flex-col"
+    >
       <div className="mb-4 aspect-[4/3] w-full overflow-hidden bg-gray-100 border border-gray-100">
         {article.hero_image_hd || article.hero_image_lq ? (
           <img
@@ -52,7 +61,11 @@ function LargeCard({ article }: { article: Article }) {
 
 function SmallCard({ article }: { article: Article }) {
   return (
-    <Link to="/article/$slug" params={{ slug: article.slug }} className="group flex h-full w-full flex-col">
+    <Link
+      to="/article/$slug"
+      params={{ slug: article.slug }}
+      className="group flex h-full w-full flex-col"
+    >
       <div className="aspect-[16/10] mb-3 w-full overflow-hidden bg-gray-100 border border-gray-100 md:aspect-[4/3]">
         {article.hero_image_hd || article.hero_image_lq ? (
           <img
@@ -78,7 +91,11 @@ function SmallCard({ article }: { article: Article }) {
 
 function LatestHorizontal({ article }: { article: Article }) {
   return (
-    <Link to="/article/$slug" params={{ slug: article.slug }} className="group flex w-full flex-col sm:items-stretch sm:flex-row sm:gap-5">
+    <Link
+      to="/article/$slug"
+      params={{ slug: article.slug }}
+      className="group flex w-full flex-col sm:items-stretch sm:flex-row sm:gap-5"
+    >
       {/* Mobile: image fills width above text. sm+: side-by-side horizontal card (img left, title centre right). */}
       <div className="aspect-[16/10] mb-3 w-full overflow-hidden bg-gray-100 border border-gray-100 sm:mb-0 sm:w-2/5 sm:shrink-0 md:w-1/3">
         {article.hero_image_hd || article.hero_image_lq ? (
@@ -168,7 +185,8 @@ function CategoryPage() {
   // Load ALL category articles (limit bumped generous so infinite split works)
   const { data, isLoading } = useQuery({
     queryKey: ["category-page-full", category.slug],
-    queryFn: () => articleService.listPublished({ categorySlug: category.slug, limit: 200, offset: 0 }),
+    queryFn: () =>
+      articleService.listPublished({ categorySlug: category.slug, limit: 200, offset: 0 }),
     staleTime: 60_000,
   });
   const all = data?.data ?? [];
@@ -187,7 +205,9 @@ function CategoryPage() {
       <header className="mb-10 border-b-4 border-yellow pb-4">
         <div className="eyebrow">Section</div>
         <h1 className="display text-4xl font-black uppercase md:text-6xl">{category.name}</h1>
-        {category.description && <p className="mt-2 text-muted-foreground">{category.description}</p>}
+        {category.description && (
+          <p className="mt-2 text-muted-foreground">{category.description}</p>
+        )}
       </header>
 
       {isLoading ? (
@@ -225,7 +245,10 @@ function CategoryPage() {
                 </div>
                 <div className="grid grid-cols-1">
                   {latest.map((a, idx) => (
-                    <div key={a.id} className={idx < latest.length - 1 ? "py-6 border-b border-gray-400" : "py-6"}>
+                    <div
+                      key={a.id}
+                      className={idx < latest.length - 1 ? "py-6 border-b border-gray-400" : "py-6"}
+                    >
                       <LatestHorizontal article={a} />
                     </div>
                   ))}

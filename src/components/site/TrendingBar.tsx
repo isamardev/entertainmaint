@@ -13,7 +13,9 @@ export function TrendingBar() {
   const rows = React.useMemo(() => {
     const seen = new Set<string>();
     return (data || []).filter((a: any) => {
-      const slug = String(a.slug || a.id || Math.random()).toLowerCase().trim();
+      const slug = String(a.slug || a.id || Math.random())
+        .toLowerCase()
+        .trim();
       if (seen.has(slug)) return false;
       seen.add(slug);
       return true;
@@ -23,12 +25,12 @@ export function TrendingBar() {
   if (!rows.length) return null;
 
   return (
-    <div className="border-b border-gray-300 bg-white">
-      <div className="container !py-0">
+    <div className="w-full border-b border-gray-300 bg-white">
+      <div className="w-full px-3 sm:px-4 md:px-6 !py-0">
         {/* Bar compressed: outer py-2 instead of py-3 (chhota height). */}
         <div className="flex flex-col items-stretch gap-2 py-2 sm:flex-row sm:items-center sm:gap-3">
           <div className="flex shrink-0 items-center gap-3 sm:w-auto">
-            <span className="display shrink-0 px-2 text-[11px] font-black uppercase tracking-[0.25em] text-black">
+            <span className="display shrink-0 pl-0 pr-2 text-[11px] font-black uppercase tracking-[0.25em] text-black">
               Trending Now
             </span>
           </div>
@@ -40,7 +42,10 @@ export function TrendingBar() {
             }}
           >
             {/* Single 1 row, flex-nowrap = NO multi row wrap ever. */}
-            <div className="flex flex-nowrap items-center gap-x-5 gap-y-0 pr-3" style={{ minWidth: "max-content" }}>
+            <div
+              className="flex flex-nowrap items-center gap-x-5 gap-y-0 pr-3"
+              style={{ minWidth: "max-content" }}
+            >
               {rows.map((a: any) => {
                 const img = a.hero_image_hd ?? a.hero_image_lq;
                 return (

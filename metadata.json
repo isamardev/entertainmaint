@@ -1,0 +1,5 @@
+{
+  "name": "Entertainment Trends",
+  "description": "Celebrity news, TV, music, style, royals and sport. Breaking entertainment stories, updated all day on Entertainment Trends.",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

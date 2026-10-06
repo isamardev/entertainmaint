@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
@@ -9,6 +10,10 @@ export function AdminSettingsForm() {
   const [newEmail, setNewEmail] = useState(user?.email ?? "");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPasswordEmail, setShowCurrentPasswordEmail] = useState(false);
+  const [showCurrentPasswordChange, setShowCurrentPasswordChange] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [emailBusy, setEmailBusy] = useState(false);
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [emailErr, setEmailErr] = useState<string | null>(null);
@@ -80,23 +85,38 @@ export function AdminSettingsForm() {
         <div className="eyebrow">Account Settings</div>
         <h2 className="display text-2xl font-black uppercase text-black">Account Security</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Update your admin username (email) or password. Your current password is required for
-          both actions as a security measure.
+          Update your admin username (email) or password. Your current password is required for both
+          actions as a security measure.
         </p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <form onSubmit={handleEmailChange} className="space-y-3 border border-gray-200 bg-gray-50 p-4">
-          <div className="text-xs font-black uppercase tracking-widest text-black">Change Username</div>
+        <form
+          onSubmit={handleEmailChange}
+          className="space-y-3 border border-gray-200 bg-gray-50 p-4"
+        >
+          <div className="text-xs font-black uppercase tracking-widest text-black">
+            Change Username
+          </div>
           <p className="text-xs text-gray-600">Current: {user?.email}</p>
-          <input
-            type="password"
-            required
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Current password"
-            className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
-          />
+          <div className="relative">
+            <input
+              type={showCurrentPasswordEmail ? "text" : "password"}
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Current password"
+              className="w-full border border-gray-300 bg-white px-3 py-2 pr-10 outline-none focus:border-black"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrentPasswordEmail((prev) => !prev)}
+              aria-label={showCurrentPasswordEmail ? "Hide password" : "Show password"}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black transition-colors p-1"
+            >
+              {showCurrentPasswordEmail ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
           <input
             type="email"
             required
@@ -115,34 +135,69 @@ export function AdminSettingsForm() {
           </button>
         </form>
 
-        <form onSubmit={handlePasswordChange} className="space-y-3 border border-gray-200 bg-gray-50 p-4">
-          <div className="text-xs font-black uppercase tracking-widest text-black">Change Password</div>
-          <input
-            type="password"
-            required
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Current password"
-            className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="New password"
-            className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Confirm new password"
-            className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
-          />
+        <form
+          onSubmit={handlePasswordChange}
+          className="space-y-3 border border-gray-200 bg-gray-50 p-4"
+        >
+          <div className="text-xs font-black uppercase tracking-widest text-black">
+            Change Password
+          </div>
+          <div className="relative">
+            <input
+              type={showCurrentPasswordChange ? "text" : "password"}
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Current password"
+              className="w-full border border-gray-300 bg-white px-3 py-2 pr-10 outline-none focus:border-black"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrentPasswordChange((prev) => !prev)}
+              aria-label={showCurrentPasswordChange ? "Hide password" : "Show password"}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black transition-colors p-1"
+            >
+              {showCurrentPasswordChange ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <div className="relative">
+            <input
+              type={showNewPassword ? "text" : "password"}
+              required
+              minLength={6}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="New password"
+              className="w-full border border-gray-300 bg-white px-3 py-2 pr-10 outline-none focus:border-black"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNewPassword((prev) => !prev)}
+              aria-label={showNewPassword ? "Hide password" : "Show password"}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black transition-colors p-1"
+            >
+              {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <div className="relative">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              required
+              minLength={6}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm new password"
+              className="w-full border border-gray-300 bg-white px-3 py-2 pr-10 outline-none focus:border-black"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black transition-colors p-1"
+            >
+              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
           {passwordErr && <div className="text-xs text-red-600">{passwordErr}</div>}
           <button
             type="submit"

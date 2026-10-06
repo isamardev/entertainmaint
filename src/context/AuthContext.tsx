@@ -1,7 +1,14 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
-import { adminAuthService, clearAdminToken, clearLegacyAdminStorage } from "@/services/adminAuthService";
+import {
+  adminAuthService,
+  clearAdminToken,
+  clearLegacyAdminStorage,
+  isSessionExpired,
+  touchAdminSession,
+} from "@/services/adminAuthService";
 
 export type Role = "reader" | "admin" | "super_admin";
 
@@ -76,6 +83,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cleanupPromise.then((cleanup) => cleanup?.());
     };
   }, []);
+
+  // 20-minute session expiration & auto-logout watcher
+  useEffect(() => {
+    const isCurrentAdmin = isDevAdmin || roles.includes("admin") || roles.includes("super_admin");
+    if (!isCurrentAdmin) return;
+
+    // Track user activity to refresh last active time (throttled to once every 10 seconds)
+    let lastTouch = Date.now();
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastTouch > 10_000) {
+        lastTouch = now;
+        touchAdminSession();
+      }
+    };
+
+    const activityEvents = ["mousedown", "keydown", "scroll", "touchstart", "click"];
+    activityEvents.forEach((evt) =>
+      window.addEventListener(evt, handleActivity, { passive: true }),
+    );
+
+    const handleAutoLogout = () => {
+      if (isSessionExpired()) {
+        clearAdminToken();
+        setIsDevAdmin(false);
+        setDevAdminEmail("");
+        setRoles([]);
+        toast.error("Session expired after 20 minutes of inactivity. Please sign in again.");
+      }
+    };
+
+    // Periodically check every 5 seconds
+    const intervalId = window.setInterval(handleAutoLogout, 5000);
+
+    // Also check on tab refocus or visibility change (e.g. after returning from another tab/app)
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        handleAutoLogout();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleAutoLogout);
+
+    return () => {
+      window.clearInterval(intervalId);
+      activityEvents.forEach((evt) => window.removeEventListener(evt, handleActivity));
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleAutoLogout);
+    };
+  }, [isDevAdmin, roles]);
 
   async function loadRoles(uid: string) {
     const { data } = await supabase.from("user_roles").select("role").eq("user_id", uid);

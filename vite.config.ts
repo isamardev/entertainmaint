@@ -13,4 +13,19 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    server: {
+      proxy: {
+        "/api": {
+          target: "https://aliceblue-goose-490382.hostingersite.com",
+          changeOrigin: true,
+          secure: false,
+          headers: {
+            Origin: "https://entertainment-trends.com",
+            Referer: "https://entertainment-trends.com/",
+          },
+        },
+      },
+    },
+  },
 });

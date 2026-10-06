@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Facebook,
-  Instagram,
-  Linkedin,
-  Mail,
-  Twitter,
-  Youtube,
-} from "lucide-react";
+import { Facebook, Instagram, Linkedin, Mail, Twitter, Youtube } from "lucide-react";
 import { getPublicSocialLinks, type SocialLinks } from "@/services/settingsService";
 
 function mailtoOrDirect(email: string): string {
@@ -167,9 +160,7 @@ export function SocialFollowLinks({
     { key: "website", label: "Website", node: <Globe size={iconSize} /> },
   ];
 
-  const visible = onlyNonEmpty
-    ? items.filter((it) => Boolean(socials[it.key]))
-    : items;
+  const visible = onlyNonEmpty ? items.filter((it) => Boolean(socials[it.key])) : items;
 
   if (visible.length === 0) return null;
 

@@ -98,10 +98,7 @@ function allowedOriginForResponse(rawOrigin, rawReferer) {
 // Hostinger error pages (if any) still inherit them and browser never shows
 // the missing header CORS symptom.
 app.use((req, res, next) => {
-  const originOk = originIsAllowed(
-    req.headers["origin"],
-    req.headers["referer"],
-  );
+  const originOk = originIsAllowed(req.headers["origin"], req.headers["referer"]);
   if (!originOk) {
     // Still write a JSON error + CORS deny header, not an opaque HTML 403.
     res.setHeader("Access-Control-Allow-Origin", "null");
@@ -115,18 +112,12 @@ app.use((req, res, next) => {
   }
   const echoOrigin = allowedOriginForResponse(req.headers["origin"], req.headers["referer"]);
   res.setHeader("Access-Control-Allow-Origin", echoOrigin);
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS",
-  );
+  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
     "Accept, Accept-Language, Authorization, Cache-Control, Content-Language, Content-Type, If-None-Match, Origin, X-Requested-With",
   );
-  res.setHeader(
-    "Access-Control-Expose-Headers",
-    "Content-Disposition, X-Total-Count",
-  );
+  res.setHeader("Access-Control-Expose-Headers", "Content-Disposition, X-Total-Count");
   res.setHeader("Access-Control-Max-Age", "86400");
   res.setHeader("Vary", "Origin, Accept-Encoding, Referer");
   if (req.method === "OPTIONS") {
@@ -170,7 +161,9 @@ app.options(/.*/, cors(CORS_OPTIONS), (_req, res) => {
 app.use(cors(CORS_OPTIONS));
 app.use(express.json({ limit: "50mb" }));
 
-const uploadsDir = path.resolve(process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || path.join(__dirname, "uploads"));
+const uploadsDir = path.resolve(
+  process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || path.join(__dirname, "uploads"),
+);
 try {
   fs.mkdirSync(uploadsDir, { recursive: true });
   fs.accessSync(uploadsDir, fs.constants.W_OK);
@@ -179,11 +172,17 @@ try {
 }
 
 function getPublicBaseUrl(req) {
-  const configured = String(process.env.PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
+  const configured = String(process.env.PUBLIC_BASE_URL || "")
+    .trim()
+    .replace(/\/$/, "");
   if (configured) return configured;
 
-  const forwardedProto = String(req.get("x-forwarded-proto") || "").split(",")[0].trim();
-  const forwardedHost = String(req.get("x-forwarded-host") || "").split(",")[0].trim();
+  const forwardedProto = String(req.get("x-forwarded-proto") || "")
+    .split(",")[0]
+    .trim();
+  const forwardedHost = String(req.get("x-forwarded-host") || "")
+    .split(",")[0]
+    .trim();
   const host = forwardedHost || req.get("host");
   const proto = forwardedProto || req.protocol;
 
@@ -205,7 +204,10 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: Number(process.env.UPLOAD_MAX_BYTES) || 250 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype && (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/"))) {
+    if (
+      file.mimetype &&
+      (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/"))
+    ) {
       return cb(null, true);
     }
     cb(new Error("Only image or video uploads are allowed"));
@@ -305,7 +307,8 @@ function sanitizeRichText(html) {
   safe = safe.replace(/data:text\/html/gi, "");
 
   // Allow semantic formatting + media blocks
-  const allowedTags = /<\/?(div|p|span|br|strong|b|em|i|u|h2|h3|h4|ul|ol|li|blockquote|a|figure|figcaption|img|iframe|video|source|section)\b[^>]*>/gi;
+  const allowedTags =
+    /<\/?(div|p|span|br|strong|b|em|i|u|h2|h3|h4|ul|ol|li|blockquote|a|figure|figcaption|img|iframe|video|source|section)\b[^>]*>/gi;
   const isSelfClosing = (raw) => /\/\s*>$/.test(raw);
 
   // Permit only safe attributes on specific tags:
@@ -327,7 +330,9 @@ function sanitizeRichText(html) {
         "player.vimeo.com",
         "vimeo.com",
       ]);
-      return iframeOkHosts.has(host) || iframeOkHosts.some((h) => host === h || host.endsWith("." + h));
+      return (
+        iframeOkHosts.has(host) || iframeOkHosts.some((h) => host === h || host.endsWith("." + h))
+      );
     } catch {
       return null;
     }
@@ -354,11 +359,15 @@ function sanitizeRichText(html) {
         }
       }
       const target = (tag.match(/\starget="([^"]*)"/i) || [])[1];
-      if (target === "_blank" || target === "_self" || target === "_top") attrs.push(`target="${target}"`);
+      if (target === "_blank" || target === "_self" || target === "_top")
+        attrs.push(`target="${target}"`);
       const rel = (tag.match(/\srel="([^"]*)"/i) || [])[1];
       if (rel && /^[\w\s-]+$/.test(rel)) attrs.push(`rel="${rel.replace(/"/g, "")}"`);
       const title = (tag.match(/\stitle="([^"]*)"/i) || [])[1];
-      if (title) attrs.push(`title="${title.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`);
+      if (title)
+        attrs.push(
+          `title="${title.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`,
+        );
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
       if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
       const d = (tag.match(/\sdata-link-applied="([^"]*)"/i) || [])[1];
@@ -387,9 +396,15 @@ function sanitizeRichText(html) {
         }
       }
       const alt = (tag.match(/\salt="([^"]*)"/i) || [])[1];
-      if (alt != null) attrs.push(`alt="${alt.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`);
+      if (alt != null)
+        attrs.push(
+          `alt="${alt.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`,
+        );
       const title = (tag.match(/\stitle="([^"]*)"/i) || [])[1];
-      if (title) attrs.push(`title="${title.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`);
+      if (title)
+        attrs.push(
+          `title="${title.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`,
+        );
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
       if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
       const loading = (tag.match(/\sloading="([^"]*)"/i) || [])[1];
@@ -414,7 +429,10 @@ function sanitizeRichText(html) {
       if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
       const allow = (tag.match(/\sallow="([^"]*)"/i) || [])[1];
       if (allow && /^[\w\s;:,()-]+$/.test(allow)) attrs.push(`allow="${allow}"`);
-      const af = (tag.match(/\sallowfullscreen\b/i) || tag.match(/\sallowfullscreen="[^"]*"/i) || tag.match(/\sallowfullscreen='[^']*'/i)) != null;
+      const af =
+        (tag.match(/\sallowfullscreen\b/i) ||
+          tag.match(/\sallowfullscreen="[^"]*"/i) ||
+          tag.match(/\sallowfullscreen='[^']*'/i)) != null;
       if (af) attrs.push("allowfullscreen");
       const loading = (tag.match(/\sloading="([^"]*)"/i) || [])[1];
       if (loading === "lazy" || loading === "eager") attrs.push(`loading="${loading}"`);
@@ -425,7 +443,8 @@ function sanitizeRichText(html) {
       const sc = (tag.match(/\sscrolling="([^"]*)"/i) || [])[1];
       if (sc === "auto" || sc === "yes" || sc === "no") attrs.push(`scrolling="${sc}"`);
       const style = (tag.match(/\sstyle="([^"]*)"/i) || [])[1];
-      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\-]+$/.test(style)) attrs.push(`style="${style}"`);
+      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\-]+$/.test(style))
+        attrs.push(`style="${style}"`);
       const w = (tag.match(/\swidth="([^"]*)"/i) || [])[1];
       if (w && /^(\d+|100%)$/.test(w)) attrs.push(`width="${w}"`);
       const h = (tag.match(/\sheight="([^"]*)"/i) || [])[1];
@@ -449,8 +468,11 @@ function sanitizeRichText(html) {
         }
       };
       if (src && videoSrcOk(src)) attrs.push(`src="${String(src).replace(/"/g, "&quot;")}"`);
-      const poster = (tag.match(/\sposter="([^"]*)"/i) || tag.match(/\sposter='([^']*)'/i) || [])[1];
-      if (poster && videoSrcOk(poster)) attrs.push(`poster="${String(poster).replace(/"/g, "&quot;")}"`);
+      const poster = (tag.match(/\sposter="([^"]*)"/i) ||
+        tag.match(/\sposter='([^']*)'/i) ||
+        [])[1];
+      if (poster && videoSrcOk(poster))
+        attrs.push(`poster="${String(poster).replace(/"/g, "&quot;")}"`);
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
       if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
       const preload = (tag.match(/\spreload="([^"]*)"/i) || [])[1];
@@ -460,7 +482,10 @@ function sanitizeRichText(html) {
       const h = (tag.match(/\sheight="([^"]*)"/i) || [])[1];
       if (h && /^(\d+|100%)$/.test(h)) attrs.push(`height="${h}"`);
       const boolAttr = (name) => {
-        const re = new RegExp(`(?:\\s${name}(?=\\s|\\/)|\\s${name}="[^"]*"|\\s${name}='[^']*')`, "i");
+        const re = new RegExp(
+          `(?:\\s${name}(?=\\s|\\/)|\\s${name}="[^"]*"|\\s${name}='[^']*')`,
+          "i",
+        );
         return re.test(tag);
       };
       if (boolAttr("controls")) attrs.push("controls");
@@ -482,15 +507,16 @@ function sanitizeRichText(html) {
           const prot = u.protocol.toLowerCase();
           if (prot === "http:" || prot === "https:") attrs.push(`src="${u.toString()}"`);
         } catch {
-          if (String(src).startsWith("/")) attrs.push(`src="${String(src).replace(/"/g, "&quot;")}"`);
+          if (String(src).startsWith("/"))
+            attrs.push(`src="${String(src).replace(/"/g, "&quot;")}"`);
         }
       }
       const type = (tag.match(/\stype="([^"]*)"/i) || tag.match(/\stype='([^']*)'/i) || [])[1];
-      if (type && /^(video|audio)\/[\w\-+.]+$/i.test(type)) attrs.push(`type="${type.replace(/"/g, "&quot;")}"`);
+      if (type && /^(video|audio)\/[\w\-+.]+$/i.test(type))
+        attrs.push(`type="${type.replace(/"/g, "&quot;")}"`);
       const close = isSelfClosing(tag) ? " />" : ">";
       return `<source${attrs.length ? " " + attrs.join(" ") : ""}${close}`;
     }
-
 
     // Helper: extract all data-* attributes from a raw tag (safe: tag keys alphanumeric-dash, values escape < > ")
     function extractDataAttrs(raw) {
@@ -499,7 +525,10 @@ function sanitizeRichText(html) {
       for (const m of double) {
         const key = m[1].toLowerCase();
         if (!key.startsWith("data-")) continue;
-        const val = String(m[2]).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        const val = String(m[2])
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
         out.push(`${key}="${val}"`);
       }
       const single = raw.matchAll(/\s([a-zA-Z][\w-]*)='([^']*)'/g);
@@ -507,13 +536,16 @@ function sanitizeRichText(html) {
         const key = m[1].toLowerCase();
         if (!key.startsWith("data-")) continue;
         if (out.some((a) => a.startsWith(`${key}="`))) continue;
-        const val = String(m[2]).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        const val = String(m[2])
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
         out.push(`${key}="${val}"`);
       }
       return out;
     }
 
-    // Explicit blockquote: allow class, cite, lang, dir, any data-* attributes (for X/Instagram/TikTok/Facebook widget embeds)
+    // Explicit blockquote: allow class, cite, lang, dir, style, any data-* attributes (for X/Instagram/TikTok/Facebook widget embeds)
     if (/^<blockquote\b/i.test(tag)) {
       const attrs = [];
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
@@ -526,22 +558,30 @@ function sanitizeRichText(html) {
           if (prot === "http:" || prot === "https:") {
             attrs.push(`cite="${u.toString().replace(/"/g, "&quot;")}"`);
           }
-        } catch { /* drop non-absolute cite */ }
+        } catch {
+          /* drop non-absolute cite */
+        }
       }
       const lang = (tag.match(/\slang="([^"]*)"/i) || [])[1];
       if (lang && /^[a-zA-Z0-9_-]+$/.test(lang)) attrs.push(`lang="${lang}"`);
       const dir = (tag.match(/\sdir="([^"]*)"/i) || [])[1];
       if (dir === "ltr" || dir === "rtl" || dir === "auto") attrs.push(`dir="${dir}"`);
+      const style = (tag.match(/\sstyle="([^"]*)"/i) || tag.match(/\sstyle='([^']*)'/i) || [])[1];
+      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style))
+        attrs.push(`style="${style.replace(/"/g, "&quot;")}"`);
       attrs.push(...extractDataAttrs(tag));
       const close = isSelfClosing(tag) ? " />" : ">";
       return `<blockquote${attrs.length ? " " + attrs.join(" ") : ""}${close}`;
     }
 
-    // Figure: allow class + any data-* attributes (for future embed markers, frontend inline enrich)
+    // Figure: allow class, style + any data-* attributes (for future embed markers, frontend inline enrich)
     if (/^<figure\b/i.test(tag)) {
       const attrs = [];
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
       if (clazz && /^[\w\s-]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
+      const style = (tag.match(/\sstyle="([^"]*)"/i) || tag.match(/\sstyle='([^']*)'/i) || [])[1];
+      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style))
+        attrs.push(`style="${style.replace(/"/g, "&quot;")}"`);
       attrs.push(...extractDataAttrs(tag));
       const close = isSelfClosing(tag) ? " />" : ">";
       return `<figure${attrs.length ? " " + attrs.join(" ") : ""}${close}`;
@@ -605,8 +645,10 @@ function sanitizeRichText(html) {
       const normalizedOpen = clean.replace(/\/?\s*>$/, "") + ">";
       return `${normalizedOpen}${link}`;
     }
-    const re = /(<blockquote[^>]*class="[^"]*(?:twitter-tweet|instagram-media|fb-post|tiktok-embed)[^"]*"[^>]*>)[\s\S]*?(<\/blockquote>)/gi;
-    const reFig = /<figure[^>]*>\s*(<blockquote[^>]*class="[^"]*(?:twitter-tweet|instagram-media|fb-post|tiktok-embed)[^"]*"[^>]*>)[\s\S]*?(<\/blockquote>)\s*<\/figure>/gi;
+    const re =
+      /(<blockquote[^>]*class="[^"]*(?:twitter-tweet|instagram-media|fb-post|tiktok-embed)[^"]*"[^>]*>)[\s\S]*?(<\/blockquote>)/gi;
+    const reFig =
+      /<figure[^>]*>\s*(<blockquote[^>]*class="[^"]*(?:twitter-tweet|instagram-media|fb-post|tiktok-embed)[^"]*"[^>]*>)[\s\S]*?(<\/blockquote>)\s*<\/figure>/gi;
     let out = html;
     out = out.replace(reFig, (_m, open, close) => `<figure>${cleanOpen(open)}${close}</figure>`);
     out = out.replace(re, (_m, open, close) => cleanOpen(open) + close);
@@ -620,9 +662,7 @@ function buildArticlePayload(body, slug, existingArticle = null) {
   const now = new Date();
   const status = body.status || existingArticle?.status || "draft";
   const publishedAt =
-    status === "published"
-      ? body.published_at || existingArticle?.published_at || now
-      : null;
+    status === "published" ? body.published_at || existingArticle?.published_at || now : null;
 
   return {
     title: body.title || existingArticle?.title || "",
@@ -1059,6 +1099,19 @@ app.get("/api/articles/slug/:slug", async (req, res) => {
 
 app.post("/api/articles", async (req, res) => {
   try {
+    if (!req.body.title || !String(req.body.title).trim()) {
+      return res.status(400).json({ error: "Article title is required." });
+    }
+    if (!req.body.dek || !String(req.body.dek).trim()) {
+      return res.status(400).json({ error: "Article description (dek) is required." });
+    }
+    if (
+      (!req.body.hero_image_hd || !String(req.body.hero_image_hd).trim()) &&
+      (!req.body.hero_image_lq || !String(req.body.hero_image_lq).trim())
+    ) {
+      return res.status(400).json({ error: "Article hero image is required." });
+    }
+
     const slug = await getUniqueArticleSlug(req.body.slug || req.body.title);
     const payload = buildArticlePayload(req.body, slug);
 
@@ -1177,7 +1230,10 @@ const startServer = async () => {
         console.log("Database connected successfully");
         dbOk = true;
       } catch (authErr) {
-        console.error("[db-authenticate-failed]", authErr && authErr.message ? authErr.message : String(authErr));
+        console.error(
+          "[db-authenticate-failed]",
+          authErr && authErr.message ? authErr.message : String(authErr),
+        );
         dbOk = false;
       }
 
@@ -1185,8 +1241,7 @@ const startServer = async () => {
         try {
           const dbSync = String(process.env.DB_SYNC || "").toLowerCase();
           const shouldSync =
-            dbSync === "true" ||
-            (process.env.NODE_ENV !== "production" && dbSync !== "false");
+            dbSync === "true" || (process.env.NODE_ENV !== "production" && dbSync !== "false");
           if (shouldSync) {
             try {
               await db.sequelize.sync({ alter: true });

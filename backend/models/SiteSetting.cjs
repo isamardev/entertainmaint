@@ -22,9 +22,7 @@ const SiteSetting = sequelize.define(
   {
     tableName: "site_settings",
     timestamps: true,
-    indexes: [
-      { fields: ["key"], unique: true },
-    ],
+    indexes: [{ fields: ["key"], unique: true }],
   },
 );
 
