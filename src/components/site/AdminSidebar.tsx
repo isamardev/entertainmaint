@@ -31,6 +31,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
   const isCategoriesActive = path.startsWith("/admin/categories");
   const isSettingsActive = path.startsWith("/admin/settings");
   const isSocialsActive = path.startsWith("/admin/socials");
+  const isPrivacyActive = path.startsWith("/admin/privacy");
 
   useEffect(() => {
     onClose?.();
@@ -91,6 +92,9 @@ export function AdminSidebar({ open = false, onClose }: Props) {
         </Link>
         <Link to="/admin/socials" className={`mb-2 block ${linkClass(isSocialsActive)}`}>
           Social Media Links
+        </Link>
+        <Link to="/admin/privacy" className={`mb-2 block ${linkClass(isPrivacyActive)}`}>
+          Privacy Policy
         </Link>
         <Link
           to="/"

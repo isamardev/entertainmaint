@@ -67,20 +67,17 @@ export function TrendingBar() {
                         />
                       </div>
                     )}
-                    {/* Title 2 lines max — BOX HEIGHT = exactly image box height (36px).
-                        Image + title thus share same vertical row height, centre aligned. */}
+                    {/* Title 2 lines max with 3 dots (ellipsis) */}
                     <span
-                      className="display inline-block flex-1 text-[11px] font-semibold leading-[1.3] text-black group-hover:text-black"
+                      className="display inline-block flex-1 text-[11px] font-semibold leading-[1.3] text-black group-hover:text-black line-clamp-2"
                       style={{
                         width: img ? "calc(210px - 48px - 10px)" : "100%",
                         wordBreak: "break-word",
                         overflow: "hidden",
+                        textOverflow: "ellipsis",
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
-                        lineClamp: 2,
-                        minHeight: "calc(11px * 1.3 * 2)",
-                        maxHeight: "calc(11px * 1.3 * 2)",
                       }}
                     >
                       {a.title}

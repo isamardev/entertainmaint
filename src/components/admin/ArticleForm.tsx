@@ -346,7 +346,24 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
         <Field label="Embedded post link">
           <input
             value={form.embed_url ?? ""}
-            onChange={(e) => set("embed_url", e.target.value)}
+            onChange={(e) => {
+              let val = e.target.value;
+              if (
+                val.includes("<blockquote") ||
+                val.includes("<iframe") ||
+                val.includes("data-instgrm-permalink")
+              ) {
+                const match =
+                  val.match(/data-instgrm-permalink="([^"]+)"/i) ||
+                  val.match(/data-embed-permalink="([^"]+)"/i) ||
+                  val.match(/src="([^"]+)"/i) ||
+                  val.match(/href="([^"]+)"/i);
+                if (match) {
+                  val = match[1].replace(/^`|`$/g, "").replace(/&amp;/g, "&").trim();
+                }
+              }
+              set("embed_url", val);
+            }}
             placeholder="Instagram, X / Twitter, TikTok, or any public post URL"
             className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
           />
@@ -1121,8 +1138,8 @@ function RichTextEditor({
     const safeAlt = String(alt || "").replace(/"/g, "&quot;");
     const safeSrc = String(src).replace(/"/g, "&quot;");
     return (
-      '<figure class="my-6 flex flex-col items-center">' +
-      `<img src="${safeSrc}" alt="${safeAlt}" class="w-full max-w-full rounded border border-gray-200 bg-gray-50" loading="lazy" />` +
+      '<figure class="my-6 flex flex-col items-center bg-white">' +
+      `<img src="${safeSrc}" alt="${safeAlt}" class="w-full max-w-full rounded border border-gray-200 bg-white" loading="lazy" />` +
       "</figure><p><br></p>"
     );
   }
@@ -1130,9 +1147,9 @@ function RichTextEditor({
   function figureVideoHtml(src: string, label?: string) {
     const safeSrc = String(src).replace(/"/g, "&quot;");
     return (
-      '<figure class="my-6 flex flex-col items-center justify-center w-full mx-auto text-center">' +
-      '<div class="w-full max-w-[580px] mx-auto overflow-hidden rounded border border-gray-200 bg-transparent shadow-sm">' +
-      `<video src="${safeSrc}" class="w-full h-auto max-h-[500px]" controls playsinline preload="metadata" poster=""></video>` +
+      '<figure class="my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
+      '<div class="w-full max-w-[580px] mx-auto overflow-hidden rounded border border-gray-200 bg-white shadow-sm">' +
+      `<video src="${safeSrc}" class="w-full h-auto max-h-[500px] bg-white" controls playsinline preload="metadata" poster=""></video>` +
       "</div>" +
       "</figure><p><br></p>"
     );
@@ -1488,15 +1505,12 @@ function RichTextEditor({
         return;
       }
       const isReel = pathOnly.startsWith("/reel/") || pathOnly.startsWith("/reels/");
-      const cleanLink = `https://www.instagram.com${pathOnly}`.replace(/\/+$/, "");
-      const maxW = isReel ? "max-w-[340px]" : "max-w-[440px]";
-      const height = isReel ? "580px" : "480px";
-      const title = isReel ? "Instagram Reel" : "Instagram Post";
+      const cleanLink = `https://www.instagram.com${pathOnly}`;
       const html =
-        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
-        `<div class="w-full ${maxW} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
-        `<iframe src="${cleanLink}/embed/" title="${title}" class="w-full block border-0 bg-white" style="height: ${height}; min-height: ${height}; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe>` +
-        "</div></figure><p><br></p>";
+        '<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[460px] mx-auto text-center bg-white" style="max-height: 76vh; overflow-y: auto;">' +
+        `<blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:440px; min-width:300px; padding:0; width:calc(100% - 2px); color-scheme:light;">` +
+        `<a href="${cleanLink}" target="_blank" rel="noopener noreferrer">View this ${isReel ? "reel" : "post"} on Instagram</a>` +
+        "</blockquote></figure><p><br></p>";
       insertHtmlAtCursor(html);
       setSocialModal({ isOpen: false, url: "" });
       savedRangeRef.current = null;
@@ -1513,12 +1527,12 @@ function RichTextEditor({
         parsed.pathname.match(/\/v\/(\d+)/)?.[1] ||
         null;
       const html = directId
-        ? '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
+        ? '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
           '<div class="w-full max-w-[325px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">' +
           `<iframe src="https://www.tiktok.com/embed/v2/${directId}" title="TikTok video" class="w-full block border-0 bg-white" style="height: 580px; min-height: 580px; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe>` +
           "</div></figure><p><br></p>"
-        : '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
-          `<blockquote class="tiktok-embed mx-auto" cite="${safePermalink}" data-video-id="" data-embed-type="tiktok" data-embed-permalink="${safePermalink}" style="max-width: 325px; min-width: 260px; margin: 0 auto;">` +
+        : '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
+          `<blockquote class="tiktok-embed mx-auto" cite="${safePermalink}" data-video-id="" data-embed-type="tiktok" data-embed-permalink="${safePermalink}" style="max-width: 325px; min-width: 260px; margin: 0 auto; background: #ffffff;">` +
           `<section><a target="_blank" rel="noopener noreferrer nofollow" href="${safePermalink}">View post on TikTok</a></section>` +
           "</blockquote></figure><p><br></p>";
       insertHtmlAtCursor(html);
@@ -1552,9 +1566,9 @@ function RichTextEditor({
           ? "aspect-video max-w-[480px]"
           : "max-w-[440px]";
       const html =
-        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
-        `<div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">` +
-        `<iframe src="${iframeSrc}" width="100%" height="${isReel || isVideo ? "100%" : "480"}" style="border: none; overflow: hidden; width: 100%; height: ${isReel || isVideo ? "100%" : "480px"}; min-height: ${isReel || isVideo ? "100%" : "250px"}; background: transparent;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen title="Facebook content" class="w-full mx-auto block bg-transparent"></iframe>` +
+        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
+        `<div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+        `<iframe src="${iframeSrc}" width="100%" height="${isReel || isVideo ? "100%" : "480"}" style="border: none; overflow: hidden; width: 100%; height: ${isReel || isVideo ? "100%" : "480px"}; min-height: ${isReel || isVideo ? "100%" : "250px"}; background: #ffffff;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen title="Facebook content" class="w-full mx-auto block bg-white"></iframe>` +
         "</div></figure><p><br></p>";
       insertHtmlAtCursor(html);
       setSocialModal({ isOpen: false, url: "" });
@@ -1589,9 +1603,9 @@ function RichTextEditor({
       const isVertical = parsed.pathname.startsWith("/shorts/") || parsed.pathname.includes("/shorts/");
       const aspectClass = isVertical ? "aspect-[9/16] max-w-[320px]" : "aspect-video max-w-[500px]";
       const html =
-        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
-        `<div class="${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">` +
-        `<iframe src="${src}" title="YouTube video" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
+        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
+        `<div class="${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+        `<iframe src="${src}" title="YouTube video" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
         "</div></figure><p><br></p>";
       insertHtmlAtCursor(html);
       setSocialModal({ isOpen: false, url: "" });

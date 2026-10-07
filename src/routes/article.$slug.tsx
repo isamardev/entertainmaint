@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { Play } from "lucide-react";
 import { articleService } from "@/services/articleService";
 import { ArticleCard } from "@/components/site/ArticleCard";
 import { ShareButtons } from "@/components/site/ShareButtons";
@@ -85,7 +86,6 @@ function ArticlePage() {
     if (!proseRef.current || typeof document === "undefined") return;
     const root = proseRef.current;
     const hasTwitter = !!root.querySelector("blockquote.twitter-tweet");
-    const hasInstagram = !!root.querySelector("blockquote.instagram-media");
     const hasTiktok = !!root.querySelector("blockquote.tiktok-embed");
     const hasFacebook = !!root.querySelector("blockquote.fb-post");
 
@@ -114,29 +114,28 @@ function ArticlePage() {
       poll();
     }
 
-    // Instagram
-    if (hasInstagram) {
-      const poll = (attempts = 0) => {
-        const w = window as any;
-        if (w.instgrm?.Embeds?.process) {
-          try {
-            w.instgrm.Embeds.process();
-          } catch {}
-          return;
-        }
-        if (attempts < 40) {
-          setTimeout(() => poll(attempts + 1), 80);
-        }
-      };
-      if (!document.querySelector('script[src="https://www.instagram.com/embed.js"]')) {
-        const s = document.createElement("script");
-        s.async = true;
-        s.defer = true;
-        s.src = "https://www.instagram.com/embed.js";
-        s.onerror = () => {};
-        document.body.appendChild(s);
-      }
-      poll();
+    // Instagram: hydrate into direct video or photo with zero black letterbox or widget bloat
+    const inlineIgBlocks = root.querySelectorAll<HTMLElement>("blockquote.instagram-media");
+    if (inlineIgBlocks.length > 0) {
+      inlineIgBlocks.forEach((bq) => {
+        const permalink =
+          bq.getAttribute("data-instgrm-permalink") ||
+          bq.getAttribute("data-embed-permalink") ||
+          bq.querySelector("a")?.href;
+        if (!permalink) return;
+        fetch(`/api/media/instagram?url=${encodeURIComponent(permalink)}`)
+          .then((r) => r.json())
+          .then((res) => {
+            if (!res?.success) return;
+            const container = bq.closest("figure") || bq;
+            if (res.type === "video" && res.videoUrl) {
+              container.innerHTML = `<div class="w-full max-w-[560px] mx-auto flex flex-col items-center justify-center bg-white rounded-xl overflow-hidden border border-gray-200 shadow-xs"><video src="${res.videoUrl}" poster="${res.imageUrl || ""}" controls playsinline preload="metadata" class="w-full max-h-[76vh] object-contain rounded-xl bg-white mx-auto block"></video></div>`;
+            } else if (res.imageUrl) {
+              container.innerHTML = `<div class="w-full max-w-[560px] mx-auto flex flex-col items-center justify-center bg-white rounded-xl overflow-hidden border border-gray-200 shadow-xs"><img src="${res.imageUrl}" alt="Instagram media" class="w-full max-h-[76vh] object-contain rounded-xl bg-white mx-auto block" /></div>`;
+            }
+          })
+          .catch(() => {});
+      });
     }
 
     // TikTok
@@ -196,19 +195,25 @@ function ArticlePage() {
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="max-w-4xl min-w-0">
           <header className="mb-6">
-            <h1 className="display text-3xl font-black uppercase leading-[0.95] md:text-5xl lg:text-6xl">
+            <h1 className="article-headline font-serif text-xl sm:text-2xl md:text-[28px] lg:text-[32px] font-bold leading-[1.2] tracking-tight text-[#111111] mb-3 normal-case">
               {article.title}
             </h1>
             {article.dek && (
-              <p className="mt-4 text-lg text-muted-foreground md:text-xl">{article.dek}</p>
+              <p className="mt-2 text-sm sm:text-base text-neutral-600 font-normal leading-relaxed">
+                {article.dek}
+              </p>
             )}
-            <div className="meta mt-4 flex flex-wrap gap-x-4 gap-y-1">
-              <span>By Entertainment Trends Staff</span>
+            <div className="meta mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+              <span className="font-semibold text-neutral-900">By Entertainment Trends Staff</span>
               {article.category?.name && (
-                <Link to="/category/$slug" params={{ slug: article.category.slug }}>
-                  <div className="eyebrow">{article.category.name}</div>
-                </Link>
+                <>
+                  <span className="text-neutral-300">•</span>
+                  <Link to="/category/$slug" params={{ slug: article.category.slug }}>
+                    <div className="eyebrow inline-block">{article.category.name}</div>
+                  </Link>
+                </>
               )}
+              <span className="text-neutral-300">•</span>
               {(() => {
                 const published = article.published_at
                   ? new Date(article.published_at).getTime()
@@ -217,25 +222,16 @@ function ArticlePage() {
                 if (published && updated - published > 5000) {
                   return <span>Updated {shortDate(article.updated_at)}</span>;
                 }
-                return <span>{shortDate(article.published_at)}</span>;
+                return <span>Published {shortDate(article.published_at)}</span>;
               })()}
             </div>
           </header>
 
           {article.embed_url && <EmbeddedPost url={article.embed_url} />}
 
-          {article.hero_image_hd && (
-            <figure className="mb-8">
-              <img src={article.hero_image_hd} alt={article.title} className="w-full" />
-              {article.hero_caption && (
-                <figcaption className="meta mt-2">{article.hero_caption}</figcaption>
-              )}
-            </figure>
-          )}
-
           <div
             ref={proseRef}
-            className="prose prose-lg max-w-none text-lg leading-relaxed prose-headings:font-black prose-headings:uppercase prose-a:text-blue-700 prose-a:no-underline hover:prose-a:underline prose-a:font-semibold prose-strong:text-black"
+            className="article-body prose max-w-none text-[15px] sm:text-[16px] leading-[1.68] text-neutral-900 font-sans prose-p:my-3.5 prose-p:text-[15px] sm:prose-p:text-[16px] prose-p:leading-[1.68] prose-p:text-neutral-900 prose-headings:font-bold prose-headings:font-serif prose-headings:text-[#111111] prose-headings:tracking-tight prose-headings:normal-case prose-h2:text-xl sm:prose-h2:text-2xl prose-h2:mt-6 prose-h2:mb-2.5 prose-h3:text-lg sm:prose-h3:text-xl prose-h3:mt-5 prose-h3:mb-2 prose-a:text-[#cc0000] prose-a:font-medium hover:prose-a:underline prose-strong:text-black prose-strong:font-bold"
             dangerouslySetInnerHTML={{ __html: articleBodyHtml }}
           />
 
@@ -317,11 +313,14 @@ function formatArticleBody(body: string) {
       .join("");
   }
 
-  // Strip any old black backgrounds from database HTML so embeds never have black background gaps
-  enriched = enriched.replace(/\b(bg-black|bg-slate-900|bg-gray-900)\b/g, "bg-transparent");
-  enriched = enriched.replace(/background(-color)?\s*:\s*(#000000|#000|black)/gi, "background: transparent");
+  // Convert any black backgrounds in database HTML to white so embeds never have black background gaps
+  enriched = enriched.replace(/\b(bg-black|bg-slate-900|bg-gray-900|bg-zinc-900)\b/g, "bg-white");
+  enriched = enriched.replace(/background(-color)?\s*:\s*(#000000|#000|black|rgb\(0,\s*0,\s*0\))/gi, "background: #ffffff");
 
-  // Transform Instagram blockquotes into responsive, clean embeds (both vertical Reels and horizontal Posts)
+  // Normalize any inline font-size styles from rich text / WordPress so paragraph size stays uniform
+  enriched = enriched.replace(/\bfont-size\s*:\s*[^;"]+;?/gi, "");
+
+  // Transform Instagram blockquotes into official responsive embeds
   enriched = enriched.replace(
     /(?:<figure[^>]*>\s*)?<blockquote\b[^>]*class="[^"]*instagram-media[^"]*"[^>]*>[\s\S]*?<\/blockquote>(?:\s*<\/figure>)?/gi,
     (fullMatch) => {
@@ -330,14 +329,10 @@ function formatArticleBody(body: string) {
         fullMatch.match(/data-embed-permalink="([^"]+)"/i) ||
         fullMatch.match(/href="([^"]+instagram\.com\/[^"]+)"/i);
       if (!permalinkMatch) return fullMatch;
-      const permalink = permalinkMatch[1].replace(/^`|`$/g, "").trim();
-      const isReel = /\/(reel|reels)\//i.test(permalink);
-      const cleanLink = permalink.replace(/\/+$/, "");
-      const iframeSrc = `${cleanLink}/embed/`;
-      const maxW = isReel ? "max-w-[340px]" : "max-w-[440px]";
-      const height = isReel ? "580px" : "480px";
-      const title = isReel ? "Instagram Reel" : "Instagram Post";
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${maxW} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${iframeSrc}" title="${title}" class="w-full block border-0 bg-white" style="height: ${height}; min-height: ${height}; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
+      const permalink = permalinkMatch[1].replace(/^`|`$/g, "").replace(/&amp;/g, "&").trim();
+      const cleanLink = permalink.replace(/\/+$/, "") + "/";
+      const isReel = /reels?/i.test(cleanLink);
+      return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[460px] mx-auto text-center bg-white" style="max-height: 76vh; overflow-y: auto;"><blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:440px; min-width:300px; padding:0; width:calc(100% - 2px); color-scheme:light;"><div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600;">View this ${isReel ? "reel" : "post"} on Instagram</a></div></blockquote></figure>`;
     },
   );
 
@@ -351,7 +346,7 @@ function formatArticleBody(body: string) {
         fullMatch.match(/\/v\/(\d+)/i);
       if (idMatch && idMatch[1]) {
         const videoId = idMatch[1];
-        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full max-w-[325px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="https://www.tiktok.com/embed/v2/${videoId}" title="TikTok Video" class="w-full block border-0 bg-white" style="height: 580px; min-height: 580px; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
+        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white"><div class="w-full max-w-[325px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="https://www.tiktok.com/embed/v2/${videoId}" title="TikTok Video" class="w-full block border-0 bg-white" style="height: 580px; min-height: 580px; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
       }
       return fullMatch;
     },
@@ -363,36 +358,34 @@ function formatArticleBody(body: string) {
     (_m, _iframeTag, src) => {
       const isVertical = /\/shorts\//i.test(src) || /tiktok\.com/i.test(src) || /\/reel\//i.test(src);
       if (/instagram\.com\/[^"]*embed/i.test(src)) {
-        const maxW = isVertical ? "max-w-[340px]" : "max-w-[440px]";
-        const height = isVertical ? "580px" : "480px";
-        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${maxW} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="w-full block border-0 bg-white" style="height: ${height}; min-height: ${height}; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
+        const cleanLink = src.replace(/\/embed\/.*$/i, "").replace(/\/+$/, "") + "/";
+        return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto text-center bg-white"><blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:0 0 1px 0 rgba(0,0,0,0.15),0 1px 10px 0 rgba(0,0,0,0.08); margin: 1px auto; max-width:540px; min-width:326px; padding:0; width:calc(100% - 2px); color-scheme:light;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer">View this post on Instagram</a></blockquote></figure>`;
       }
       if (isVertical) {
-        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-[9/16] w-full max-w-[320px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white"><div class="aspect-[9/16] w-full max-w-[320px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
       }
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-video w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white"><div class="aspect-video w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
     },
   );
 
-  // Wrap bare (non-figured) iframes in responsive wrapper (detect vertical vs horizontal, bg-transparent)
+  // Wrap bare (non-figured) iframes in responsive wrapper (detect vertical vs horizontal, bg-white)
   enriched = enriched.replace(/(<iframe\b[^>]*src="([^"]*)"[^>]*>[\s\S]*?<\/iframe>)/gi, (iframe, src) => {
     const isVertical = /\/shorts\//i.test(src) || /tiktok\.com/i.test(src) || /\/reel\//i.test(src);
     if (/instagram\.com\/[^"]*embed/i.test(src)) {
-      const maxW = isVertical ? "max-w-[340px]" : "max-w-[440px]";
-      const height = isVertical ? "580px" : "480px";
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${maxW} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${iframe}</div></figure>`;
+      const cleanLink = src.replace(/\/embed\/.*$/i, "").replace(/\/+$/, "") + "/";
+      return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto text-center bg-white"><blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:0 0 1px 0 rgba(0,0,0,0.15),0 1px 10px 0 rgba(0,0,0,0.08); margin: 1px auto; max-width:540px; min-width:326px; padding:0; width:calc(100% - 2px); color-scheme:light;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer">View this post on Instagram</a></blockquote></figure>`;
     }
     if (isVertical) {
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-[9/16] w-full max-w-[320px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white"><div class="aspect-[9/16] w-full max-w-[320px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
     }
-    return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-video w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+    return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white"><div class="aspect-video w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
   });
 
-  // Wrap standalone video tags: restrained, centered, bg-transparent
+  // Wrap standalone video tags: restrained, centered, bg-white
   enriched = enriched.replace(
     /(<video\b[^>]*>(?:[\s\S]*?<\/video>|<video\b[^>]*\/>))/gi,
     (_m, videoTag) => {
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full max-w-[480px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">${videoTag}</div></figure>`;
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white"><div class="w-full max-w-[480px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${videoTag}</div></figure>`;
     },
   );
 
@@ -411,7 +404,7 @@ function formatArticleBody(body: string) {
       cleanBq = cleanBq.replace(/data-width="[0-9]+"/i, 'data-width="auto"');
     }
     const maxW = isTwitter ? "max-w-[460px]" : "max-w-[460px]";
-    return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full ${maxW} mx-auto text-center bg-transparent">${cleanBq}</figure>`;
+    return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full ${maxW} mx-auto text-center bg-white">${cleanBq}</figure>`;
   };
   enriched = enriched.replace(embedBQRe, (_m: string, bq: string) => wrapEmbed(bq));
   enriched = enriched.replace(standaloneBQRe, (_m: string, bq: string) => wrapEmbed(bq));
@@ -421,7 +414,7 @@ function formatArticleBody(body: string) {
     /(<img\b[^>]*>)(?!\s*<\/figcaption>|<\/a><\/figure>|<\/source>|<\/video>)/gi,
     (_m, img) => {
       if (/class="[^"]*w-full/.test(img) || /<figure[\s\S]*$/i.test(img)) return img;
-      return `<figure class="my-6 flex flex-col items-center">${img.replace(/^<img\b/i, '<img class="w-full max-w-full rounded border border-gray-200 bg-gray-50" loading="lazy"')}</figure>`;
+      return `<figure class="my-6 flex flex-col items-center bg-white">${img.replace(/^<img\b/i, '<img class="w-full max-w-full rounded border border-gray-200 bg-white" loading="lazy"')}</figure>`;
     },
   );
 
@@ -678,6 +671,180 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;");
 }
 
+function InstagramMediaDirect({
+  permalink,
+  isReel,
+}: {
+  permalink: string;
+  isReel?: boolean;
+}) {
+  const [data, setData] = useState<{
+    type: "video" | "image";
+    videoUrl?: string | null;
+    imageUrl?: string | null;
+    rawVideoUrl?: string | null;
+    rawImageUrl?: string | null;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setIsPlaying(false);
+    setImgError(false);
+    fetch(`/api/media/instagram?url=${encodeURIComponent(permalink)}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (!active) return;
+        if (res?.success && (res.videoUrl || res.imageUrl)) {
+          setData(res);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [permalink]);
+
+  // When user clicks play, start video immediately
+  useEffect(() => {
+    if (isPlaying && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [isPlaying]);
+
+  const maxW = isReel ? "max-w-[420px]" : "max-w-[560px]";
+
+  if (loading) {
+    return (
+      <section className="my-6 w-full flex flex-col items-center justify-center">
+        <div
+          className={`w-full ${maxW} aspect-[9/16] bg-gray-50 border border-gray-100 rounded-xl flex flex-col items-center justify-center text-xs text-gray-400 animate-pulse mx-auto`}
+          style={{ maxHeight: "76vh" }}
+        >
+          <div className="w-10 h-10 rounded-full border-2 border-gray-300 border-t-black animate-spin mb-3" />
+          <span>Loading post...</span>
+        </div>
+      </section>
+    );
+  }
+
+  // Determine thumbnail image URL: first try proxied imageUrl, fallback to rawImageUrl
+  const thumbUrl = imgError
+    ? data?.rawImageUrl || data?.imageUrl
+    : data?.imageUrl || data?.rawImageUrl;
+
+  if (data?.type === "video" && (data.videoUrl || data.rawVideoUrl)) {
+    const videoSrc = data.videoUrl || data.rawVideoUrl || "";
+    return (
+      <section className="my-6 w-full flex flex-col items-center justify-center">
+        <div
+          className={`w-full ${maxW} mx-auto flex flex-col items-center justify-center bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm relative group`}
+          style={{ maxHeight: "76vh" }}
+        >
+          {!isPlaying ? (
+            <div
+              className="relative w-full cursor-pointer flex flex-col items-center justify-center bg-white overflow-hidden select-none"
+              onClick={() => setIsPlaying(true)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setIsPlaying(true);
+                }
+              }}
+              aria-label="Play video"
+            >
+              {thumbUrl ? (
+                <img
+                  src={thumbUrl}
+                  alt="Post thumbnail"
+                  onError={() => {
+                    if (!imgError && data.rawImageUrl && data.rawImageUrl !== thumbUrl) {
+                      setImgError(true);
+                    }
+                  }}
+                  className="w-full max-h-[76vh] object-contain rounded-xl bg-white mx-auto block"
+                />
+              ) : (
+                <div className="w-full aspect-[9/16] max-h-[76vh] bg-neutral-100 flex items-center justify-center" />
+              )}
+
+              {/* Centered Play Button Overlay */}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-all rounded-xl">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/95 text-black flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-200">
+                  <Play className="w-7 h-7 sm:w-9 sm:h-9 fill-black text-black ml-1" />
+                </div>
+              </div>
+
+              {/* Discreet badge showing type */}
+              <div className="absolute top-3 right-3 px-2.5 py-1 bg-black/70 backdrop-blur-xs text-white text-[11px] font-bold rounded-full uppercase tracking-wider">
+                {isReel ? "Reel" : "Video"}
+              </div>
+            </div>
+          ) : (
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              poster={thumbUrl || undefined}
+              controls
+              autoPlay
+              playsInline
+              preload="auto"
+              className="w-full max-h-[76vh] object-contain rounded-xl bg-white mx-auto block"
+              onEnded={() => setIsPlaying(false)}
+            />
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  if (data?.imageUrl || data?.rawImageUrl) {
+    return (
+      <section className="my-6 w-full flex flex-col items-center justify-center">
+        <div
+          className={`w-full ${maxW} mx-auto flex flex-col items-center justify-center bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm`}
+          style={{ maxHeight: "76vh" }}
+        >
+          <img
+            src={thumbUrl || ""}
+            alt="Instagram media"
+            onError={() => {
+              if (!imgError && data.rawImageUrl && data.rawImageUrl !== thumbUrl) {
+                setImgError(true);
+              }
+            }}
+            className="w-full max-h-[76vh] object-contain rounded-xl bg-white mx-auto block"
+          />
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="my-6 w-full flex flex-col items-center justify-center">
+      <div className="w-full max-w-[480px] mx-auto p-4 bg-white border border-gray-200 rounded-xl text-center shadow-xs">
+        <a
+          href={permalink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors"
+        >
+          View this {isReel ? "Reel" : "Post"} on Instagram
+        </a>
+      </div>
+    </section>
+  );
+}
+
 function EmbeddedPost({ url }: { url: string }) {
   const embed = getEmbedConfig(url);
 
@@ -760,7 +927,7 @@ function EmbeddedPost({ url }: { url: string }) {
 
   if (!embed) {
     return (
-      <div className="mb-8 border border-gray-200 bg-gray-50 p-4">
+      <div className="mb-8 border border-gray-200 bg-white p-4">
         <div className="display mb-2 text-lg font-black uppercase">Related Post</div>
         <a
           href={url}
@@ -775,50 +942,38 @@ function EmbeddedPost({ url }: { url: string }) {
   }
 
   if (embed.type === "instagram") {
-    const isReel = /\/(reel|reels)\//i.test(embed.permalink);
-    const cleanUrl = embed.permalink.replace(/\/+$/, "");
-    const iframeSrc = `${cleanUrl}/embed/`;
-    const containerMaxW = isReel ? "max-w-[340px]" : "max-w-[440px]";
-    const height = isReel ? 580 : 480;
-
-    return (
-      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
-        <div
-          className={`w-full ${containerMaxW} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm`}
-        >
-          <iframe
-            src={iframeSrc}
-            title={isReel ? "Instagram Reel" : "Instagram Post"}
-            className="w-full block border-0 bg-white"
-            style={{
-              height: `${height}px`,
-              minHeight: `${height}px`,
-              width: "100%",
-              border: 0,
-            }}
-            scrolling="no"
-            frameBorder="0"
-            allowTransparency
-          />
-        </div>
-      </section>
-    );
+    const isReel = (embed as any).isReel || /reels?/i.test(embed.permalink);
+    return <InstagramMediaDirect permalink={embed.permalink} isReel={isReel} />;
   }
 
   if (embed.type === "twitter") {
     return (
-      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
-        <div className="w-full max-w-[460px] mx-auto flex justify-center">
-          <blockquote
-            className="twitter-tweet mx-auto"
-            data-align="center"
-            data-conversation="none"
-            data-dnt="true"
+      <section className="mb-8 w-full flex flex-col items-center justify-center">
+        <div
+          className="w-full max-w-[480px] mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden"
+          style={{
+            maxHeight: "76vh",
+            minHeight: "320px",
+          }}
+        >
+          <div
+            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start p-2 bg-white"
+            style={{
+              maxHeight: "76vh",
+              scrollbarWidth: "thin",
+            }}
           >
-            <a href={embed.permalink} target="_blank" rel="noreferrer">
-              {embed.permalink}
-            </a>
-          </blockquote>
+            <blockquote
+              className="twitter-tweet mx-auto"
+              data-align="center"
+              data-conversation="none"
+              data-dnt="true"
+            >
+              <a href={embed.permalink} target="_blank" rel="noreferrer">
+                {embed.permalink}
+              </a>
+            </blockquote>
+          </div>
         </div>
       </section>
     );
@@ -829,19 +984,27 @@ function EmbeddedPost({ url }: { url: string }) {
       (embed as any).isShorts ||
       embed.src.includes("/shorts/") ||
       url.includes("/shorts/");
-    const aspectClass = isShorts ? "aspect-[9/16] max-w-[320px]" : "aspect-video max-w-[500px]";
+    const maxW = isShorts ? "max-w-[340px]" : "max-w-[540px]";
+    const aspectClass = isShorts ? "aspect-[9/16]" : "aspect-video";
     return (
-      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
-        <div className={`${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm`}>
-          <iframe
-            src={embed.src}
-            title="Embedded YouTube video"
-            className="h-full w-full block border-0 bg-transparent"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-            loading="lazy"
-          />
+      <section className="mb-8 w-full flex flex-col items-center justify-center">
+        <div
+          className={`w-full ${maxW} mx-auto flex flex-col items-center justify-center bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden`}
+          style={{
+            maxHeight: "76vh",
+          }}
+        >
+          <div className={`${aspectClass} w-full mx-auto overflow-hidden bg-white`}>
+            <iframe
+              src={embed.src}
+              title="Embedded YouTube video"
+              className="h-full w-full block border-0 bg-white"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+              loading="lazy"
+            />
+          </div>
         </div>
       </section>
     );
@@ -860,44 +1023,55 @@ function EmbeddedPost({ url }: { url: string }) {
       ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto`
       : `https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=auto`;
     const containerClass = isReel
-      ? "aspect-[9/16] max-w-[320px]"
+      ? "aspect-[9/16] max-w-[340px]"
       : isVideo
-        ? "aspect-video max-w-[480px]"
-        : "max-w-[440px]";
+        ? "aspect-video max-w-[500px]"
+        : "max-w-[460px]";
 
     return (
-      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
+      <section className="mb-8 w-full flex flex-col items-center justify-center">
         <div
-          className={`w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm`}
+          className={`w-full ${containerClass} mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden`}
+          style={{
+            maxHeight: "76vh",
+            minHeight: "320px",
+          }}
         >
-          <iframe
-            src={iframeSrc}
-            width="100%"
-            height={isReel || isVideo ? "100%" : "480"}
+          <div
+            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start bg-white p-2"
             style={{
-              border: "none",
-              overflow: "hidden",
-              width: "100%",
-              height: isReel || isVideo ? "100%" : undefined,
-              minHeight: isReel || isVideo ? "100%" : "250px",
-              background: "transparent",
+              maxHeight: "76vh",
+              scrollbarWidth: "thin",
             }}
-            scrolling="no"
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            allowFullScreen
-            title="Facebook content"
-            className="w-full mx-auto block bg-transparent"
-          />
-          <div className="p-2 text-center w-full bg-white/80">
-            <a
-              href={rawHref}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-bold underline text-black break-all"
-            >
-              View on Facebook
-            </a>
+          >
+            <iframe
+              src={iframeSrc}
+              width="100%"
+              style={{
+                border: "none",
+                overflow: "hidden",
+                width: "100%",
+                minHeight: isReel ? "500px" : isVideo ? "300px" : "420px",
+                background: "#ffffff",
+                backgroundColor: "#ffffff",
+              }}
+              scrolling="no"
+              frameBorder="0"
+              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+              allowFullScreen
+              title="Facebook content"
+              className="w-full mx-auto block bg-white"
+            />
+            <div className="p-2 text-center w-full bg-white">
+              <a
+                href={rawHref}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold underline text-black break-all"
+              >
+                View on Facebook
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -907,54 +1081,89 @@ function EmbeddedPost({ url }: { url: string }) {
   if (embed.type === "tiktok") {
     const videoId = embed.videoId;
     return (
-      <section className="mb-8 flex flex-col items-center justify-center w-full mx-auto text-center">
-        <div className="w-full max-w-[325px] mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          {videoId ? (
-            <iframe
-              src={`https://www.tiktok.com/embed/v2/${videoId}`}
-              title="TikTok video"
-              className="w-full block border-0 bg-white"
-              style={{ height: "580px", minHeight: "580px", width: "100%", border: 0 }}
-              scrolling="no"
-              frameBorder="0"
-              allowTransparency
-            />
-          ) : (
-            <blockquote
-              className="tiktok-embed mx-auto"
-              cite={embed.permalink}
-              style={{ maxWidth: "325px", minWidth: "260px", margin: "0 auto" }}
-            >
-              <section>
-                <a href={embed.permalink} target="_blank" rel="noreferrer">
-                  {embed.permalink}
-                </a>
-              </section>
-            </blockquote>
-          )}
+      <section className="mb-8 w-full flex flex-col items-center justify-center">
+        <div
+          className="w-full max-w-[340px] mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden"
+          style={{
+            maxHeight: "76vh",
+            minHeight: "360px",
+          }}
+        >
+          <div
+            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start bg-white p-2"
+            style={{
+              maxHeight: "76vh",
+              scrollbarWidth: "thin",
+            }}
+          >
+            {videoId ? (
+              <iframe
+                src={`https://www.tiktok.com/embed/v2/${videoId}`}
+                title="TikTok video"
+                className="w-full block border-0 bg-white"
+                style={{ height: "560px", minHeight: "480px", width: "100%", border: 0 }}
+                scrolling="no"
+                frameBorder="0"
+                allowTransparency
+              />
+            ) : (
+              <blockquote
+                className="tiktok-embed mx-auto"
+                cite={embed.permalink}
+                style={{ maxWidth: "325px", minWidth: "260px", margin: "0 auto", background: "#ffffff" }}
+              >
+                <section>
+                  <a href={embed.permalink} target="_blank" rel="noreferrer">
+                    {embed.permalink}
+                  </a>
+                </section>
+              </blockquote>
+            )}
+          </div>
         </div>
       </section>
     );
   }
 
   return (
-    <div className="mb-8 border border-gray-200 bg-gray-50 p-4">
-      <div className="display mb-2 text-lg font-black uppercase">Embedded Post</div>
-      <a
-        href={(embed as any).href ?? url}
-        target="_blank"
-        rel="noreferrer"
-        className="break-all text-sm font-bold text-black underline"
-      >
-        {(embed as any).href ?? url}
-      </a>
-    </div>
+    <section className="mb-8 w-full flex flex-col items-center justify-center">
+      <div className="w-full max-w-[460px] mx-auto border border-gray-200 rounded-xl bg-white p-4 shadow-xs" style={{ maxHeight: "76vh" }}>
+        <div className="display mb-2 text-lg font-black uppercase">Embedded Post</div>
+        <a
+          href={(embed as any)?.href ?? url}
+          target="_blank"
+          rel="noreferrer"
+          className="break-all text-sm font-bold text-black underline"
+        >
+          {(embed as any)?.href ?? url}
+        </a>
+      </div>
+    </section>
   );
 }
 
 function getEmbedConfig(url: string) {
   try {
-    const parsed = new URL(url.trim());
+    let cleanUrl = (url || "").trim();
+    if (!cleanUrl) return null;
+
+    if (
+      cleanUrl.includes("<blockquote") ||
+      cleanUrl.includes("<iframe") ||
+      cleanUrl.includes("data-instgrm-permalink")
+    ) {
+      const match =
+        cleanUrl.match(/data-instgrm-permalink="([^"]+)"/i) ||
+        cleanUrl.match(/data-embed-permalink="([^"]+)"/i) ||
+        cleanUrl.match(/cite="([^"]+)"/i) ||
+        cleanUrl.match(/src="([^"]+)"/i) ||
+        cleanUrl.match(/href="([^"]+)"/i);
+      if (match) {
+        cleanUrl = match[1].replace(/^`|`$/g, "").replace(/&amp;/g, "&").trim();
+      }
+    }
+
+    const parsed = new URL(cleanUrl);
     const host = parsed.hostname.replace(/^www\./, "");
 
     if (
@@ -972,15 +1181,18 @@ function getEmbedConfig(url: string) {
 
     if (host === "instagram.com" || host === "m.instagram.com" || host === "instagr.am") {
       const pathOnly = parsed.pathname.replace(/\/+$/, "") + "/";
+      const isReel = /^\/reels?\//i.test(pathOnly);
       if (
         pathOnly.startsWith("/p/") ||
         pathOnly.startsWith("/reel/") ||
+        pathOnly.startsWith("/reels/") ||
         pathOnly.startsWith("/tv/") ||
         pathOnly.startsWith("/stories/")
       ) {
         return {
           type: "instagram" as const,
           permalink: `https://www.instagram.com${pathOnly}`,
+          isReel,
         };
       }
       return {

@@ -32,7 +32,14 @@ export function TrendingSidebar() {
                     <Link
                       to="/article/$slug"
                       params={{ slug: a.slug }}
-                      className="display block text-sm font-bold leading-snug hover:text-black"
+                      className="display block text-sm font-bold leading-snug hover:text-black line-clamp-3"
+                      style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
                     >
                       {a.title}
                     </Link>

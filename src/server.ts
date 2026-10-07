@@ -49,18 +49,29 @@ export default {
     try {
       const url = new URL(request.url);
       if (url.pathname.startsWith("/api/")) {
-        const targetUrl = `https://aliceblue-goose-490382.hostingersite.com${url.pathname}${url.search}`;
-        const headers = new Headers(request.headers);
-        headers.set("host", "aliceblue-goose-490382.hostingersite.com");
-        headers.set("origin", "https://entertainment-trends.com");
-        headers.set("referer", "https://entertainment-trends.com/");
-        const upstreamRes = await fetch(targetUrl, {
-          method: request.method,
-          headers,
-          body: request.method !== "GET" && request.method !== "HEAD" ? request.body : undefined,
-          duplex: "half",
-        } as any);
-        return upstreamRes;
+        try {
+          const targetUrl = `https://aliceblue-goose-490382.hostingersite.com${url.pathname}${url.search}`;
+          const headers = new Headers(request.headers);
+          headers.set("host", "aliceblue-goose-490382.hostingersite.com");
+          headers.set("origin", "https://entertainment-trends.com");
+          headers.set("referer", "https://entertainment-trends.com/");
+          const upstreamRes = await fetch(targetUrl, {
+            method: request.method,
+            headers,
+            body: request.method !== "GET" && request.method !== "HEAD" ? request.body : undefined,
+            duplex: "half",
+          } as any);
+          return upstreamRes;
+        } catch (apiErr) {
+          console.warn("Upstream API fetch failed:", apiErr);
+          return new Response(
+            JSON.stringify({ error: "Upstream API temporarily unavailable" }),
+            {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            },
+          );
+        }
       }
 
       const handler = await getServerEntry();

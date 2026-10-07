@@ -702,6 +702,40 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+const { getInstagramMedia, streamInstagramMedia } = require("./lib/instagram-media.cjs");
+
+app.get("/api/media/instagram", async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ success: false, error: "Missing url parameter" });
+  try {
+    const result = await getInstagramMedia(url);
+    if (!result.success) return res.status(400).json(result);
+    return res.json({
+      ...result,
+      videoUrl: result.videoUrl
+        ? `/api/media/instagram/stream?url=${encodeURIComponent(result.videoUrl)}`
+        : null,
+      imageUrl: result.imageUrl
+        ? `/api/media/instagram/image?url=${encodeURIComponent(result.imageUrl)}`
+        : null,
+      rawVideoUrl: result.videoUrl,
+      rawImageUrl: result.imageUrl,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/media/instagram/stream", (req, res) => {
+  const targetUrl = req.query.url;
+  streamInstagramMedia(targetUrl, req, res);
+});
+
+app.get("/api/media/instagram/image", (req, res) => {
+  const targetUrl = req.query.url;
+  streamInstagramMedia(targetUrl, req, res);
+});
+
 async function ensureDefaultAdmin() {
   const count = await Admin.count();
   if (count > 0) return;
@@ -847,7 +881,60 @@ app.put("/api/admin/password", requireAdmin, async (req, res) => {
 
 const SETTINGS_KEY_SOCIALS = "social_links";
 const SETTINGS_KEY_META = "site_meta";
+const SETTINGS_KEY_PRIVACY = "privacy_policy";
 const SettingsModel = db.SiteSetting || require("./models/SiteSetting.cjs");
+
+const DEFAULT_PRIVACY_POLICY = {
+  title: "Privacy Policy",
+  last_updated: "October 2026",
+  intro:
+    "This Privacy Policy explains how Entertainment Trends (“we”, “us”, or “our”) collects, uses, and protects information when you visit the Site.",
+  content: `<section>
+  <h2>1. Information We Collect</h2>
+  <p>We collect two categories of information: (a) information you voluntarily provide, and (b) information automatically collected as you browse the Site.</p>
+  <ul>
+    <li><strong>Voluntary information:</strong> name, email address or message body when you submit a contact form or email us.</li>
+    <li><strong>Automatic information:</strong> your IP address, browser type, device type, referring website, pages visited, and approximate country/region via standard web server logs.</li>
+    <li><strong>Cookies & storage:</strong> small text files stored in your browser to remember preferences, anonymised analytics sessions, and ad serving settings.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>2. How We Use Information</h2>
+  <ul>
+    <li>To operate, maintain and improve the Site and our editorial output.</li>
+    <li>To respond to your enquiries, feedback or tips submitted via email or contact forms.</li>
+    <li>To measure anonymous audience engagement with stories and pages.</li>
+    <li>To personalise advertisements and content where permitted by applicable law.</li>
+    <li>To detect, prevent and address security, spam or abuse issues.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>3. Cookies & Similar Technologies</h2>
+  <p>We use both first-party and third-party cookies and similar technologies (e.g. local storage, web beacons) to remember your preferences and analyze audience engagement. You can control or disable cookies through your browser settings.</p>
+</section>
+
+<section>
+  <h2>4. Third-Party Services</h2>
+  <p>Portions of the Site are served through trusted third-party providers including hosting companies, analytics providers, CDNs, and ad networks. These providers may process your information under their own privacy policies.</p>
+</section>
+
+<section>
+  <h2>5. Your Rights</h2>
+  <p>Depending on where you live, you may have rights to request access to, correction of, or deletion of your personal information, or object to certain processing.</p>
+</section>
+
+<section>
+  <h2>6. Data Retention</h2>
+  <p>Contact correspondence is retained for a maximum of 24 months after the last communication unless longer retention is required by law. Anonymised analytics data is kept in aggregate form indefinitely.</p>
+</section>
+
+<section>
+  <h2>7. Contact</h2>
+  <p>If you have any questions, concerns, or requests regarding this policy or how your data is handled, write to us via our Contact page or email privacy@entertainmenttrends.com.</p>
+</section>`,
+};
 
 const DEFAULT_SOCIAL_LINKS = {
   facebook: "",
@@ -979,6 +1066,53 @@ app.post("/api/admin/settings", requireAdmin, async (req, res) => {
       updated.site_meta = await writeSettingsJSON(SETTINGS_KEY_META, cleanMeta);
     }
     res.json({ ok: true, updated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Public Privacy Policy endpoint
+app.get("/api/settings/privacy", async (req, res) => {
+  try {
+    const meta = await readSettingsJSON(SETTINGS_KEY_META, {});
+    const privacy = await readSettingsJSON(SETTINGS_KEY_PRIVACY, null);
+    const data = privacy || meta?.privacy_policy || DEFAULT_PRIVACY_POLICY;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin endpoints for Privacy Policy
+app.get("/api/admin/privacy", requireAdmin, async (req, res) => {
+  try {
+    const meta = await readSettingsJSON(SETTINGS_KEY_META, {});
+    const privacy = await readSettingsJSON(SETTINGS_KEY_PRIVACY, null);
+    const data = privacy || meta?.privacy_policy || DEFAULT_PRIVACY_POLICY;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/admin/privacy", requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const updated = {
+      title: (body.title || DEFAULT_PRIVACY_POLICY.title).trim(),
+      last_updated: (body.last_updated || DEFAULT_PRIVACY_POLICY.last_updated).trim(),
+      intro: (body.intro || "").trim(),
+      content: (body.content || DEFAULT_PRIVACY_POLICY.content).trim(),
+      updated_at: new Date().toISOString(),
+    };
+    await writeSettingsJSON(SETTINGS_KEY_PRIVACY, updated);
+
+    // Also mirror to site_meta for universal compatibility
+    const meta = (await readSettingsJSON(SETTINGS_KEY_META, {})) || {};
+    meta.privacy_policy = updated;
+    await writeSettingsJSON(SETTINGS_KEY_META, meta);
+
+    res.json({ ok: true, privacy: updated });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

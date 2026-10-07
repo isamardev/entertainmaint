@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
+import { Loader2 } from "lucide-react";
 import { articleService, type Article } from "@/services/articleService";
 import { ArticleCard, ArticleMedia } from "@/components/site/ArticleCard";
 import { TrendingSidebar } from "@/components/site/Sidebar";
@@ -33,11 +35,24 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const [visibleCount, setVisibleCount] = useState(18);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["home-articles"],
-    queryFn: () => articleService.listPublished({ limit: 25 }),
+    queryFn: () => articleService.listPublished({ limit: 100 }),
   });
-  const articles = data?.data ?? [];
+  const allArticles = data?.data ?? [];
+  const articles = allArticles.slice(0, visibleCount);
+  const hasMore = visibleCount < allArticles.length;
+
+  const handleShowMore = () => {
+    setIsLoadingMore(true);
+    setTimeout(() => {
+      setVisibleCount((prev) => prev + 12);
+      setIsLoadingMore(false);
+    }, 200);
+  };
   const mobileSections: Array<{ featured?: Article; list: Article[] }> = [];
 
   let mobileIndex = 0;
@@ -227,6 +242,27 @@ function Home() {
             )}
           </div>
 
+          {/* Show More Button */}
+          {!isLoading && hasMore && (
+            <div className="my-10 flex justify-center">
+              <button
+                type="button"
+                onClick={handleShowMore}
+                disabled={isLoadingMore}
+                className="w-full max-w-md py-3.5 px-8 border-2 border-black bg-white hover:bg-black text-black hover:text-white font-black uppercase text-sm tracking-widest transition-all duration-200 flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading Stories...</span>
+                  </>
+                ) : (
+                  <span>Show More Stories</span>
+                )}
+              </button>
+            </div>
+          )}
+
           <div className="mt-10 lg:hidden">
             <TrendingSidebar />
           </div>
@@ -263,7 +299,7 @@ function FeaturedArticle({
   if (!article) return null;
 
   const img = articleImage(article, useAltImage);
-  const titleSize = "text-2xl font-black leading-[0.95] md:text-4xl lg:text-5xl";
+  const titleSize = "text-xl sm:text-2xl md:text-[28px] lg:text-[32px] font-black leading-[1.15]";
 
   return (
     <section key={`featured${keySuffix}`} className="mb-10">
@@ -274,7 +310,16 @@ function FeaturedArticle({
           className="mb-4 aspect-[16/9] w-full overflow-hidden bg-surface"
           imgClassName="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
-        <h3 className={`display ${titleSize} group-hover:text-black text-center`}>
+        <h3
+          className={`display ${titleSize} group-hover:text-black text-center line-clamp-3`}
+          style={{
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
           {article.title}
         </h3>
         {article.dek && !hideDek && (
@@ -376,11 +421,20 @@ function SplitArticleLayout({
           imgClassName="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
         <div className="shrink-0 text-left">
-          <h3 className="display text-xl font-black leading-tight group-hover:text-black">
+          <h3
+            className="display text-base sm:text-[17px] font-black leading-snug group-hover:text-black line-clamp-3"
+            style={{
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {article.title}
           </h3>
           {article.dek && (
-            <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{article.dek}</p>
+            <p className="mt-1.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">{article.dek}</p>
           )}
         </div>
       </Link>
@@ -397,11 +451,20 @@ function SplitArticleLayout({
         imgClassName="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
       />
       <div className="shrink-0">
-        <h3 className="display text-2xl font-black leading-[0.95] md:text-3xl lg:text-4xl group-hover:text-black text-center">
+        <h3
+          className="display text-lg sm:text-xl md:text-2xl font-black leading-snug group-hover:text-black text-center line-clamp-3"
+          style={{
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
           {largeArticle.title}
         </h3>
         {largeArticle.dek && (
-          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{largeArticle.dek}</p>
+          <p className="mt-2 line-clamp-2 text-xs sm:text-sm text-muted-foreground">{largeArticle.dek}</p>
         )}
       </div>
     </Link>

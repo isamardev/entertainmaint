@@ -5,6 +5,10 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const { getInstagramMedia, streamInstagramMedia } = require("./backend/lib/instagram-media.cjs");
 
 export default defineConfig({
   nitro: { preset: "node-server" },
@@ -14,7 +18,57 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    plugins: [
+      {
+        name: "instagram-media-dev-proxy",
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            const urlObj = new URL(req.url || "", "http://localhost:3000");
+            if (urlObj.pathname === "/api/media/instagram") {
+              const url = urlObj.searchParams.get("url");
+              if (!url) {
+                res.writeHead(400, { "Content-Type": "application/json" });
+                return res.end(JSON.stringify({ success: false, error: "Missing url" }));
+              }
+              try {
+                const result = await getInstagramMedia(url);
+                res.writeHead(200, {
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "*",
+                });
+                return res.end(
+                  JSON.stringify({
+                    ...result,
+                    videoUrl: result.videoUrl
+                      ? `/api/media/instagram/stream?url=${encodeURIComponent(result.videoUrl)}`
+                      : null,
+                    imageUrl: result.imageUrl
+                      ? `/api/media/instagram/image?url=${encodeURIComponent(result.imageUrl)}`
+                      : null,
+                    rawVideoUrl: result.videoUrl,
+                    rawImageUrl: result.imageUrl,
+                  })
+                );
+              } catch (err) {
+                res.writeHead(500, { "Content-Type": "application/json" });
+                return res.end(JSON.stringify({ success: false, error: err.message }));
+              }
+            }
+            if (
+              urlObj.pathname === "/api/media/instagram/stream" ||
+              urlObj.pathname === "/api/media/instagram/image"
+            ) {
+              const targetUrl = urlObj.searchParams.get("url");
+              return streamInstagramMedia(targetUrl, req, res);
+            }
+            next();
+          });
+        },
+      },
+    ],
     server: {
+      host: "0.0.0.0",
+      port: 3000,
       proxy: {
         "/api": {
           target: "https://aliceblue-goose-490382.hostingersite.com",

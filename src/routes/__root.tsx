@@ -95,8 +95,7 @@ function RootComponent() {
   const router = useRouter();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
-  const isArticlePage = location.pathname.startsWith("/article/");
-  const showTrending = isArticlePage;
+  const showTrending = !isAdminRoute;
   const { direction, atTop } = useScrollDirection(10);
   const headerWrapRef = useRef<HTMLDivElement | null>(null);
 

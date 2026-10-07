@@ -26,15 +26,26 @@ export function ArticleCard({ article, size = "md", horizontal = false, imageOve
       <div className={horizontal ? "min-w-0 flex-1" : "mt-3"}>
         <Link to="/article/$slug" params={{ slug: article.slug }}>
           <h3
-            className={`display font-black leading-tight group-hover:text-black ${
-              size === "lg" ? "text-3xl md:text-4xl" : size === "sm" ? "text-base" : "text-xl"
+            className={`display font-black leading-snug group-hover:text-black line-clamp-3 ${
+              size === "lg"
+                ? "text-xl md:text-2xl"
+                : size === "sm"
+                  ? "text-sm sm:text-[15px]"
+                  : "text-base sm:text-lg"
             }`}
+            style={{
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
           >
             {article.title}
           </h3>
         </Link>
         {size !== "sm" && article.dek && (
-          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{article.dek}</p>
+          <p className="mt-1.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">{article.dek}</p>
         )}
       </div>
     </article>
