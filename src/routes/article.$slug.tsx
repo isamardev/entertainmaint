@@ -123,18 +123,53 @@ function ArticlePage() {
           bq.getAttribute("data-embed-permalink") ||
           bq.querySelector("a")?.href;
         if (!permalink) return;
+
+        // Ensure blockquote has SDK-required attributes BEFORE we try either replacement
+        if (!bq.hasAttribute("data-instgrm-permalink")) bq.setAttribute("data-instgrm-permalink", permalink);
+        if (!bq.hasAttribute("data-instgrm-version")) bq.setAttribute("data-instgrm-version", "14");
+        if (!bq.hasAttribute("data-instgrm-captioned")) bq.setAttribute("data-instgrm-captioned", "");
+
+        // Replace child skeleton if present, but keep open tag intact for SDK fallback
+        const fallbackAnchor = bq.querySelector("a");
+        if (fallbackAnchor && !/background/i.test(bq.getAttribute("style") || "")) {
+          bq.setAttribute("style", (bq.getAttribute("style") || "") + "background:#FFFFFF;background-color:#FFFFFF;border:0;border-radius:12px;box-shadow:none;margin:1px auto;max-width:540px;min-width:326px;padding:0;width:calc(100% - 2px);color-scheme:light;");
+        }
+
         fetch(`/api/media/instagram?url=${encodeURIComponent(permalink)}`)
-          .then((r) => r.json())
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad status"))))
           .then((res) => {
-            if (!res?.success) return;
+            if (!res?.success) throw new Error("no media");
             const container = bq.closest("figure") || bq;
             if (res.type === "video" && res.videoUrl) {
               container.innerHTML = `<div class="w-full max-w-[560px] mx-auto flex flex-col items-center justify-center bg-white rounded-xl overflow-hidden border border-gray-200 shadow-xs"><video src="${res.videoUrl}" poster="${res.imageUrl || ""}" controls playsinline preload="metadata" class="w-full max-h-[76vh] object-contain rounded-xl bg-white mx-auto block"></video></div>`;
             } else if (res.imageUrl) {
               container.innerHTML = `<div class="w-full max-w-[560px] mx-auto flex flex-col items-center justify-center bg-white rounded-xl overflow-hidden border border-gray-200 shadow-xs"><img src="${res.imageUrl}" alt="Instagram media" class="w-full max-h-[76vh] object-contain rounded-xl bg-white mx-auto block" /></div>`;
+            } else {
+              throw new Error("empty media urls");
             }
           })
-          .catch(() => {});
+          .catch(() => {
+            // Direct media fallback failed — load Instagram's official embed SDK to hydrate the blockquote
+            const pollIg = (attempts = 0) => {
+              const w = window as any;
+              if (w.instgrm?.Embeds?.process) {
+                try {
+                  w.instgrm.Embeds.process();
+                  return;
+                } catch {}
+              }
+              if (attempts < 40) setTimeout(() => pollIg(attempts + 1), 80);
+            };
+            if (!document.querySelector('script[src="https://www.instagram.com/embed.js"]')) {
+              const s = document.createElement("script");
+              s.async = true;
+              s.defer = true;
+              s.src = "https://www.instagram.com/embed.js";
+              s.onerror = () => {};
+              document.body.appendChild(s);
+            }
+            pollIg();
+          });
       });
     }
 

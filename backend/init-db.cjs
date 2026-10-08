@@ -4,11 +4,28 @@ const db = require("./models/index.cjs");
 const Category = require("./models/Category.cjs");
 
 const createDatabase = async () => {
+  const databaseUrl = process.env.DATABASE_URL;
   const explicitDialect = process.env.DB_DIALECT;
-  const useDatabaseUrl = Boolean(process.env.DATABASE_URL) && explicitDialect !== "mysql";
 
-  if (useDatabaseUrl || explicitDialect === "postgres") {
-    console.log("Skipping CREATE DATABASE because Neon/Postgres database already exists.");
+  // Guess dialect from the URL (if present). Always use DATABASE_URL when set.
+  let dialect = explicitDialect || "mysql";
+  if (databaseUrl) {
+    try {
+      const u = new URL(databaseUrl);
+      const proto = (u.protocol || "").replace(/:$/, "").toLowerCase();
+      if (proto === "postgres" || proto === "postgresql") dialect = "postgres";
+      else if (proto === "mysql" || proto === "mysql2") dialect = "mysql";
+      else if (proto === "mariadb") dialect = "mariadb";
+    } catch {
+      /* keep explicitDialect */
+    }
+  }
+
+  const useDatabaseUrl = Boolean(databaseUrl);
+  const isPostgres = dialect === "postgres";
+
+  if (useDatabaseUrl || isPostgres) {
+    console.log("Skipping CREATE DATABASE because Postgres/remote DATABASE_URL database already exists.");
     return;
   }
 

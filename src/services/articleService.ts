@@ -34,13 +34,27 @@ export type Article = {
   category?: Category | null;
 };
 
+const IS_DEV_BUILD = Boolean((import.meta as any).env?.DEV);
+const PROD_BACKEND_ORIGIN = "https://aliceblue-goose-490382.hostingersite.com";
+
 export function normalizeMediaUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "";
-  // Route Hostinger uploads through same-origin /api/uploads/ to prevent browser 403 CORS blocks
-  return url.replace(
-    /^https?:\/\/aliceblue-goose-490382\.hostingersite\.com\/api\/uploads\//i,
-    "/api/uploads/",
-  );
+  const absolutePrefix = /^https?:\/\/aliceblue-goose-490382\.hostingersite\.com\/api\/uploads\//i;
+  if (absolutePrefix.test(url)) {
+    if (IS_DEV_BUILD) {
+      // Locally dev proxy handles /api/uploads → keep relative
+      return url.replace(absolutePrefix, "/api/uploads/");
+    }
+    // Production: frontend is on a static domain with NO backend proxy.
+    // Relative /api/uploads/ 404s. Keep absolute origin URL (backend CORS
+    // whitelists the frontend origin).
+    return url;
+  }
+  if (url.startsWith("/api/uploads/")) {
+    if (IS_DEV_BUILD) return url;
+    return `${PROD_BACKEND_ORIGIN}${url}`;
+  }
+  return url;
 }
 
 export function normalizeArticleMedia(a: Article): Article {
@@ -52,10 +66,16 @@ export function normalizeArticleMedia(a: Article): Article {
     typeof body === "string" &&
     body.includes("aliceblue-goose-490382.hostingersite.com/api/uploads/")
   ) {
-    body = body.replace(
-      /https?:\/\/aliceblue-goose-490382\.hostingersite\.com\/api\/uploads\//gi,
-      "/api/uploads/",
-    );
+    const abs = /https?:\/\/aliceblue-goose-490382\.hostingersite\.com\/api\/uploads\//gi;
+    if (IS_DEV_BUILD) {
+      body = body.replace(abs, "/api/uploads/");
+    } else {
+      // Production: leave absolute URLs unchanged (backend CORS handles it).
+      body = body;
+    }
+  } else if (typeof body === "string" && IS_DEV_BUILD === false) {
+    // Body had relative /api/uploads/ — rewrite to absolute origin for prod.
+    body = body.replace(/(["'])\/api\/uploads\//gi, `$1${PROD_BACKEND_ORIGIN}/api/uploads/`);
   }
   return {
     ...a,

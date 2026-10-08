@@ -47,12 +47,16 @@ const CORS_ALLOWED_ORIGINS = new Set(
   [
     "https://entertainment-trends.com",
     "https://www.entertainment-trends.com",
+    "http://entertainment-trends.com",
+    "http://www.entertainment-trends.com",
     "https://aliceblue-goose-490382.hostingersite.com",
+    "http://aliceblue-goose-490382.hostingersite.com",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://localhost:3001",
+    "null",
   ].map((o) => o.toLowerCase()),
 );
 
@@ -97,29 +101,60 @@ function allowedOriginForResponse(rawOrigin, rawReferer) {
 // Even on thrown errors, OPTIONS, static files — Node writes these FIRST so
 // Hostinger error pages (if any) still inherit them and browser never shows
 // the missing header CORS symptom.
+//
+// EXTRA-GUARANTEE (DOUBLE-WRITE):
+//   Hostinger shared hosting's Passenger + Apache pipeline can silently drop
+//   or fail to echo headers set by middlewares, especially when later error
+//   handlers call res.setHeader() again or an async throw short-circuits the
+//   middleware chain. To ensure CORS NEVER fails we patch the response BEFORE
+//   ANY middleware runs: once via `res.setHeader` and ALSO by wrapping
+//   res.writeHead / _write — whichever pipeline Apache uses, the ACAO header
+//   gets re-appended right before bytes hit the socket.
 app.use((req, res, next) => {
   const originOk = originIsAllowed(req.headers["origin"], req.headers["referer"]);
+  let echoOrigin;
   if (!originOk) {
-    // Still write a JSON error + CORS deny header, not an opaque HTML 403.
-    res.setHeader("Access-Control-Allow-Origin", "null");
-    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    res.setHeader("Vary", "Origin, Referer");
+    echoOrigin = "null";
+  } else {
+    echoOrigin = allowedOriginForResponse(req.headers["origin"], req.headers["referer"]);
+  }
+
+  const attachCorsHeaders = () => {
+    res.setHeader("Access-Control-Allow-Origin", echoOrigin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Accept, Accept-Language, Authorization, Cache-Control, Content-Language, Content-Type, If-None-Match, Origin, X-Requested-With",
+    );
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition, X-Total-Count");
+    res.setHeader("Access-Control-Max-Age", "86400");
+    res.setHeader("Vary", "Origin, Accept-Encoding, Referer");
+  };
+
+  // (1) Normal synchronous middleware-level write.
+  attachCorsHeaders();
+
+  // (2) Wrap writeHead so any late res.status(X).json(Y) or express error
+  //     handler that resets headers still gets CORS re-applied. Node calls
+  //     writeHead right before sending headers on the wire.
+  const _writeHead = res.writeHead.bind(res);
+  res.writeHead = function wrappedWriteHead(statusCode, statusMessage, headers) {
+    attachCorsHeaders();
+    if (typeof statusMessage === "object" && statusMessage !== null) {
+      return _writeHead(statusCode, statusMessage);
+    }
+    return _writeHead(statusCode, statusMessage, headers);
+  };
+
+  if (!originOk) {
     if (req.method === "OPTIONS") {
-      return res.status(204).end();
+      res.statusCode = 204;
+      res.removeHeader("Content-Type");
+      return res.end();
     }
     return res.status(403).json({ error: "CORS policy: origin not allowed." });
   }
-  const echoOrigin = allowedOriginForResponse(req.headers["origin"], req.headers["referer"]);
-  res.setHeader("Access-Control-Allow-Origin", echoOrigin);
-  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Accept, Accept-Language, Authorization, Cache-Control, Content-Language, Content-Type, If-None-Match, Origin, X-Requested-With",
-  );
-  res.setHeader("Access-Control-Expose-Headers", "Content-Disposition, X-Total-Count");
-  res.setHeader("Access-Control-Max-Age", "86400");
-  res.setHeader("Vary", "Origin, Accept-Encoding, Referer");
+
   if (req.method === "OPTIONS") {
     res.statusCode = 204;
     res.removeHeader("Content-Type");
@@ -321,18 +356,21 @@ function sanitizeRichText(html) {
       const prot = u.protocol.toLowerCase();
       if (prot !== "http:" && prot !== "https:") return null;
       const host = u.hostname.replace(/^www\./, "");
-      // iframes whitelist
-      const iframeOkHosts = new Set([
+      const iframeOkHosts = [
         "youtube-nocookie.com",
         "youtube.com",
         "m.youtube.com",
         "youtu.be",
+        "music.youtube.com",
         "player.vimeo.com",
         "vimeo.com",
-      ]);
-      return (
-        iframeOkHosts.has(host) || iframeOkHosts.some((h) => host === h || host.endsWith("." + h))
-      );
+        "tiktok.com",
+        "facebook.com",
+        "fb.watch",
+        "fb.com",
+        "instagram.com",
+      ];
+      return iframeOkHosts.some((h) => host === h || host.endsWith("." + h));
     } catch {
       return null;
     }
@@ -754,6 +792,47 @@ async function ensureDefaultAdmin() {
   });
 
   console.log(`Default admin account created for ${email}`);
+}
+
+async function ensureDefaultSiteSettings() {
+  try {
+    const Settings = SettingsModel;
+    const existingSocials = await Settings.findOne({ where: { key: SETTINGS_KEY_SOCIALS } });
+    if (!existingSocials) {
+      await Settings.create({
+        key: SETTINGS_KEY_SOCIALS,
+        value: JSON.stringify(DEFAULT_SOCIAL_LINKS),
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      console.log("Default site_settings.social_links seeded.");
+    }
+    const existingPrivacy = await Settings.findOne({ where: { key: SETTINGS_KEY_PRIVACY } });
+    if (!existingPrivacy) {
+      await Settings.create({
+        key: SETTINGS_KEY_PRIVACY,
+        value: JSON.stringify(DEFAULT_PRIVACY_POLICY),
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      console.log("Default site_settings.privacy_policy seeded.");
+    }
+    const existingMeta = await Settings.findOne({ where: { key: SETTINGS_KEY_META } });
+    if (!existingMeta) {
+      await Settings.create({
+        key: SETTINGS_KEY_META,
+        value: JSON.stringify({ privacy_policy: DEFAULT_PRIVACY_POLICY }),
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      console.log("Default site_settings.site_meta seeded.");
+    }
+  } catch (seedErr) {
+    console.error(
+      "[default-site-settings-warning] ensureDefaultSiteSettings failed — continuing startup anyway. Detail:",
+      seedErr && seedErr.message ? seedErr.message : String(seedErr),
+    );
+  }
 }
 
 function getBearerToken(req) {
@@ -1394,6 +1473,14 @@ const startServer = async () => {
             console.error(
               "[default-admin-warning] ensureDefaultAdmin failed — continuing startup. Admin panel login may not work until fixed. Detail:",
               adminErr && adminErr.message ? adminErr.message : String(adminErr),
+            );
+          }
+          try {
+            await ensureDefaultSiteSettings();
+          } catch (settingsErr) {
+            console.error(
+              "[default-site-settings-warning] ensureDefaultSiteSettings failed — continuing startup. Detail:",
+              settingsErr && settingsErr.message ? settingsErr.message : String(settingsErr),
             );
           }
         } catch (miscDbErr) {

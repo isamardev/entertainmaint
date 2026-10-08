@@ -21,6 +21,7 @@ import { Route as ArticleSlugRouteImport } from './routes/article.$slug'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSocialsRouteImport } from './routes/admin.socials'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminPrivacyRouteImport } from './routes/admin.privacy'
 import { Route as AdminNewRouteImport } from './routes/admin.new'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
@@ -86,6 +87,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPrivacyRoute = AdminPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminNewRoute = AdminNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/privacy': typeof AdminPrivacyRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/socials': typeof AdminSocialsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/privacy': typeof AdminPrivacyRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/socials': typeof AdminSocialsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/privacy': typeof AdminPrivacyRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/socials': typeof AdminSocialsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/login'
     | '/admin/new'
+    | '/admin/privacy'
     | '/admin/settings'
     | '/admin/socials'
     | '/admin/users'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/login'
     | '/admin/new'
+    | '/admin/privacy'
     | '/admin/settings'
     | '/admin/socials'
     | '/admin/users'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/login'
     | '/admin/new'
+    | '/admin/privacy'
     | '/admin/settings'
     | '/admin/socials'
     | '/admin/users'
@@ -314,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/privacy': {
+      id: '/admin/privacy'
+      path: '/privacy'
+      fullPath: '/admin/privacy'
+      preLoaderRoute: typeof AdminPrivacyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/new': {
       id: '/admin/new'
       path: '/new'
@@ -349,6 +368,7 @@ interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminNewRoute: typeof AdminNewRoute
+  AdminPrivacyRoute: typeof AdminPrivacyRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSocialsRoute: typeof AdminSocialsRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -360,6 +380,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminNewRoute: AdminNewRoute,
+  AdminPrivacyRoute: AdminPrivacyRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSocialsRoute: AdminSocialsRoute,
   AdminUsersRoute: AdminUsersRoute,

@@ -57,7 +57,32 @@ fs.writeFileSync(path.join(outDir, "index.html"), html);
 
 const htaccess = `RewriteEngine On
 RewriteBase /
+
+# ----------- API PROXY TO BACKEND -----------
+# Route /api/* and /api/media/instagram requests to the standalone backend
+# (Hostinger Node.js app). This keeps frontend on entertainment-trends.com using
+# SAME-ORIGIN /api URLs — which means zero CORS preflight, zero CORB, no mixed
+# content warnings, and shared backend uploads (/api/uploads/*) resolve correctly.
+SSLProxyEngine On
+ProxyPreserveHost Off
+ProxyRequests Off
+
+# /api/media sub-route (Instagram direct media scraper + stream)
+<IfModule mod_proxy.c>
+  ProxyPass        /api https://aliceblue-goose-490382.hostingersite.com/api connectiontimeout=15 timeout=60
+  ProxyPassReverse /api https://aliceblue-goose-490382.hostingersite.com/api
+
+  # Ensure incoming Origin header reflects the public frontend domain so the
+  # Node.js backend CORS whitelist accepts it.
+  RequestHeader set Origin "https://entertainment-trends.com"
+  RequestHeader set Referer "https://entertainment-trends.com/"
+  RequestHeader unset X-Forwarded-Host
+</IfModule>
+
+# ----------- SPA FALLBACK -----------
+# For any URL that is NOT /api/* and NOT a real file/dir, serve index.html
 RewriteRule ^index\\.html$ - [L]
+RewriteCond %{REQUEST_URI} !^/api [NC]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule . /index.html [L]

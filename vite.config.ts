@@ -6,9 +6,7 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const { getInstagramMedia, streamInstagramMedia } = require("./backend/lib/instagram-media.cjs");
+const requireFromRoot = createRequire(import.meta.url);
 
 export default defineConfig({
   nitro: { preset: "node-server" },
@@ -22,7 +20,19 @@ export default defineConfig({
       {
         name: "instagram-media-dev-proxy",
         configureServer(server) {
+          // Dev-only require — avoids breaking production builds that don't include backend/
+          let instagramModules: any = null;
+          try {
+            instagramModules = requireFromRoot("./backend/lib/instagram-media.cjs");
+          } catch {
+            server.config.logger.warn(
+              "[instagram-media-dev-proxy] backend/lib/instagram-media.cjs not found — dev proxy disabled. Production backend handles these routes."
+            );
+          }
+
           server.middlewares.use(async (req, res, next) => {
+            if (!instagramModules) return next();
+            const { getInstagramMedia, streamInstagramMedia } = instagramModules;
             const urlObj = new URL(req.url || "", "http://localhost:3000");
             if (urlObj.pathname === "/api/media/instagram") {
               const url = urlObj.searchParams.get("url");
