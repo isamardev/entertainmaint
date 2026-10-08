@@ -817,6 +817,16 @@ async function ensureDefaultSiteSettings() {
       });
       console.log("Default site_settings.privacy_policy seeded.");
     }
+    const existingContact = await Settings.findOne({ where: { key: SETTINGS_KEY_CONTACT } });
+    if (!existingContact) {
+      await Settings.create({
+        key: SETTINGS_KEY_CONTACT,
+        value: JSON.stringify(DEFAULT_CONTACT_SETTINGS),
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      console.log("Default site_settings.contact_page seeded.");
+    }
     const existingMeta = await Settings.findOne({ where: { key: SETTINGS_KEY_META } });
     if (!existingMeta) {
       await Settings.create({
@@ -984,7 +994,52 @@ app.put("/api/admin/password", requireAdmin, async (req, res) => {
 const SETTINGS_KEY_SOCIALS = "social_links";
 const SETTINGS_KEY_META = "site_meta";
 const SETTINGS_KEY_PRIVACY = "privacy_policy";
+const SETTINGS_KEY_CONTACT = "contact_page";
 const SettingsModel = db.SiteSetting || require("./models/SiteSetting.cjs");
+
+const DEFAULT_CONTACT_SETTINGS = {
+  page_title: "Contact Us",
+  eyebrow: "Pages",
+  subtitle:
+    "Questions, corrections, story tips, or partnership enquiries? We'd love to hear from you.",
+  general_title: "General Enquiries",
+  general_email: "editorial@entertainmenttrends.example",
+  general_description:
+    "For general questions, corrections, or feedback about a story, email our editors at",
+  general_response_note: "We endeavour to respond within 2–3 business days.",
+  tips_title: "Story Tips",
+  tips_email: "tips@entertainmenttrends.example",
+  tips_description: "Got a lead or a tip worth covering? Send it to",
+  tips_note: "We treat anonymous submissions with the highest level of confidentiality.",
+  partners_title: "Press & Partnerships",
+  partners_email: "partners@entertainmenttrends.example",
+  partners_description:
+    "For brand partnerships, affiliate enquiries, press access, or advertising opportunities, please write to",
+  partners_response_note:
+    "and a member of our commercial team will get back to you within one business day.",
+  address_title: "Mail",
+  company_name: "Entertainment Trends Ltd.",
+  address_line1: "221B Fleet Street",
+  address_line2: "London, EC4A 2DY",
+  country: "United Kingdom",
+  phone: "",
+  whatsapp: "",
+  sidebar_follow_title: "Follow",
+  sidebar_follow_description:
+    "Stay connected with Entertainment Trends on your favourite social platform.",
+  show_social_links: true,
+  sidebar_response_title: "Response times",
+  response_times: [
+    "Editorial: 2–3 business days",
+    "Press / Commercial: 1 business day",
+    "Technical issues: 24 hours",
+  ],
+  enable_contact_form: true,
+  form_title: "Send Us a Message",
+  form_description:
+    "Have a quick inquiry or suggestion? Drop us a note below and our team will get back to you.",
+  additional_notes: "",
+};
 
 const DEFAULT_PRIVACY_POLICY = {
   title: "Privacy Policy",
@@ -1215,6 +1270,71 @@ app.post("/api/admin/privacy", requireAdmin, async (req, res) => {
     await writeSettingsJSON(SETTINGS_KEY_META, meta);
 
     res.json({ ok: true, privacy: updated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Public Contact Page settings endpoint
+app.get("/api/settings/contact", async (req, res) => {
+  try {
+    const meta = await readSettingsJSON(SETTINGS_KEY_META, {});
+    const contact = await readSettingsJSON(SETTINGS_KEY_CONTACT, null);
+    const data = contact || meta?.contact_settings || DEFAULT_CONTACT_SETTINGS;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin endpoints for Contact Page settings
+app.get("/api/admin/contact", requireAdmin, async (req, res) => {
+  try {
+    const meta = await readSettingsJSON(SETTINGS_KEY_META, {});
+    const contact = await readSettingsJSON(SETTINGS_KEY_CONTACT, null);
+    const data = contact || meta?.contact_settings || DEFAULT_CONTACT_SETTINGS;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/admin/contact", requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const updated = {
+      ...DEFAULT_CONTACT_SETTINGS,
+      ...body,
+      page_title: (body.page_title || DEFAULT_CONTACT_SETTINGS.page_title).trim(),
+      eyebrow: (body.eyebrow || DEFAULT_CONTACT_SETTINGS.eyebrow).trim(),
+      updated_at: new Date().toISOString(),
+    };
+    await writeSettingsJSON(SETTINGS_KEY_CONTACT, updated);
+
+    // Also mirror to site_meta for universal compatibility
+    const meta = (await readSettingsJSON(SETTINGS_KEY_META, {})) || {};
+    meta.contact_settings = updated;
+    await writeSettingsJSON(SETTINGS_KEY_META, meta);
+
+    res.json({ ok: true, settings: updated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Public Contact Message submission endpoint
+app.post("/api/contact/message", async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body || {};
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: "Name, email, and message are required." });
+    }
+    // Log inquiry safely for admin record
+    console.log(`[contact-inquiry] From: ${name} <${email}> | Subject: ${subject || "No Subject"}`);
+    res.json({
+      ok: true,
+      message: "Thank you for reaching out! Your message has been received.",
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

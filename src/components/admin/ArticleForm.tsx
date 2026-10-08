@@ -103,18 +103,11 @@ function stripTransientHtml(sourceHtml: string): string {
   if (!sourceHtml) return "";
   const scratch = document.createElement("div");
   scratch.innerHTML = sourceHtml;
-  scratch.querySelectorAll("button.art-inline-remove").forEach((b) => b.remove());
-  scratch.querySelectorAll<HTMLElement>('[data-art-block="1"], figure').forEach((blk) => {
+  scratch.querySelectorAll("button.art-inline-remove, [data-art-remove='1']").forEach((b) => b.remove());
+  scratch.querySelectorAll(".art-inline-row").forEach((r) => r.remove());
+  scratch.querySelectorAll<HTMLElement>('[data-art-block="1"]').forEach((blk) => {
     blk.classList.remove("art-inline-wrap");
     blk.removeAttribute("data-art-block");
-    const row = blk.querySelector<HTMLElement>(":scope > .art-inline-row");
-    if (row) row.remove();
-    const existingFigCap = blk.querySelector<HTMLElement>(":scope > figcaption");
-    if (existingFigCap) existingFigCap.remove();
-    blk.querySelectorAll<HTMLElement>('br[data-art-spacer="1"]').forEach((br) => br.remove());
-  });
-  scratch.querySelectorAll(".art-inline-row").forEach((r) => {
-    r.remove();
   });
   scratch.querySelectorAll("figcaption").forEach((fc) => fc.remove());
   return scratch.innerHTML.trim();
@@ -343,7 +336,7 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
             className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
           />
         </Field>
-        <Field label="Embedded post link">
+        <Field label="Embedded post or video link (Instagram, Facebook, X, YouTube, TikTok...)">
           <input
             value={form.embed_url ?? ""}
             onChange={(e) => {
@@ -364,11 +357,11 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
               }
               set("embed_url", val);
             }}
-            placeholder="Instagram, X / Twitter, TikTok, or any public post URL"
+            placeholder="Instagram, Facebook, X / Twitter, YouTube, TikTok, Threads post or video link"
             className="w-full border border-gray-300 bg-white px-3 py-2 outline-none focus:border-black"
           />
           <div className="mt-1 text-xs text-muted-foreground">
-            Photo upload aur post embed link dono ek sath save ho sakte hain.
+            Hero photo upload aur post/video embed link dono ek sath save ho sakte hain.
           </div>
         </Field>
       </div>
@@ -671,21 +664,26 @@ function RichTextEditor({
     url: "",
     openInNewTab: true,
   });
-  const [videoModal, setVideoModal] = useState<{ isOpen: boolean; url: string }>({
-    isOpen: false,
-    url: "",
-  });
-  const [socialModal, setSocialModal] = useState<{ isOpen: boolean; url: string }>({
+  const [embedModal, setEmbedModal] = useState<{ isOpen: boolean; url: string }>({
     isOpen: false,
     url: "",
   });
 
   useEffect(() => {
     if (!editorRef.current) return;
+    // If the user is currently editing / focused in this editor, DO NOT overwrite innerHTML!
+    const isFocused =
+      document.activeElement === editorRef.current ||
+      editorRef.current.contains(document.activeElement);
+    if (isFocused) return;
+
     const currentStripped = stripTransientHtml(editorRef.current.innerHTML);
     const valueStripped = stripTransientHtml(value || "");
     if (currentStripped !== valueStripped) {
       editorRef.current.innerHTML = value || "<p></p>";
+      setTimeout(() => {
+        if (editorRef.current) inventoryAll();
+      }, 0);
     }
   }, [value]);
 
@@ -727,84 +725,78 @@ function RichTextEditor({
       return btn;
     }
 
-    // Ensure every removable block has a simple bottom row (caption optional + always Remove button)
-    function ensureBlockUi(block: HTMLElement) {
-      if (!editor.contains(block)) return;
-      if (block.getAttribute("data-art-block") === "1") {
-        // Ensure row and button
-        const row = block.querySelector<HTMLElement>(":scope > .art-inline-row");
-        if (!row) buildBottomRow(block);
-        else if (!row.querySelector("button.art-inline-remove"))
-          row.appendChild(makeRemoveBtn(block));
+    function setupFigureBlock(fig: HTMLElement) {
+      fig.setAttribute("data-art-block", "1");
+      fig.setAttribute("contenteditable", "false");
+      fig.classList.add("art-inline-wrap");
+
+      // Strictly ensure there is AT MOST ONE button.art-inline-remove inside this figure
+      const existingBtns = Array.from(fig.querySelectorAll<HTMLButtonElement>("button.art-inline-remove"));
+      if (existingBtns.length > 0) {
+        // Keep only the first one, delete all duplicate buttons
+        for (let i = 1; i < existingBtns.length; i++) {
+          attachedBtnsRef.current.delete(existingBtns[i]);
+          existingBtns[i].remove();
+        }
         return;
       }
 
-      const tag = block.tagName;
-
-      // Bare VIDEO / IFRAME / linked media (<a><img/>..</a>) / standalone social embed blockquotes → wrap in <figure data-art-block> + row
-      if (
-        tag === "VIDEO" ||
-        tag === "IFRAME" ||
-        (tag === "A" && block.querySelector("img, video, iframe") != null) ||
-        (tag === "BLOCKQUOTE" &&
-          /(^|\s)(twitter-tweet|instagram-media|fb-post|tiktok-embed)(\s|$)/.test(
-            block.getAttribute("class") || "",
-          ))
-      ) {
-        const fig = document.createElement("figure");
-        fig.setAttribute("data-art-block", "1");
-        fig.classList.add("art-inline-wrap");
-        fig.style.margin = "0";
-        fig.style.padding = "0";
-        fig.style.background = "transparent";
-        const style = block.getAttribute("style") || "";
-        if (style) fig.style.cssText = style;
-        const prev = block.previousSibling;
-        const parent = block.parentElement || editor;
-        if (prev) prev.after(fig);
-        else parent.insertBefore(fig, parent.firstChild);
-        fig.appendChild(block);
-        buildBottomRow(fig);
-        return;
-      }
-
-      if (tag === "FIGURE") {
-        block.setAttribute("data-art-block", "1");
-        block.classList.add("art-inline-wrap");
-        buildBottomRow(block);
-        return;
-      }
-    }
-
-    function buildBottomRow(block: HTMLElement) {
-      const oldRows = block.querySelectorAll<HTMLElement>(":scope > .art-inline-row");
-      oldRows.forEach((r) => {
-        const oldBtns = r.querySelectorAll<HTMLButtonElement>("button.art-inline-remove");
-        oldBtns.forEach((b) => attachedBtnsRef.current.delete(b));
-        r.remove();
-      });
-      const oldCaption = block.querySelector<HTMLElement>(":scope > figcaption");
-      if (oldCaption) oldCaption.remove();
+      // If no button exists yet, create exactly one row + button
       const row = document.createElement("div");
       row.className = "art-inline-row";
       row.setAttribute("contenteditable", "false");
+      row.setAttribute("data-art-remove", "1");
       row.style.background = "transparent";
-      const spacer = document.createElement("div");
-      spacer.className = "art-inline-caption";
-      spacer.textContent = "\u00A0";
-      spacer.setAttribute("contenteditable", "false");
-      spacer.style.visibility = "hidden";
-      spacer.style.flex = "1 1 auto";
-      row.appendChild(spacer);
-      row.appendChild(makeRemoveBtn(block));
-      block.appendChild(row);
+      row.appendChild(makeRemoveBtn(fig));
+      fig.appendChild(row);
+    }
+
+    function wrapBareMedia(block: HTMLElement) {
+      // Double check: if it is ALREADY inside any figure, DO NOT wrap!
+      if (block.closest("figure")) return;
+
+      const fig = document.createElement("figure");
+      fig.setAttribute("data-art-block", "1");
+      fig.setAttribute("contenteditable", "false");
+      fig.classList.add("art-inline-wrap");
+      fig.style.margin = "0";
+      fig.style.padding = "0";
+      fig.style.background = "transparent";
+      const style = block.getAttribute("style") || "";
+      if (style) fig.style.cssText = style;
+      const prev = block.previousSibling;
+      const parent = block.parentElement || editor;
+      if (prev) prev.after(fig);
+      else parent.insertBefore(fig, parent.firstChild);
+      fig.appendChild(block);
+      setupFigureBlock(fig);
     }
 
     function inventoryAll() {
-      const items = Array.from(
-        editor.querySelectorAll<HTMLElement>("figure, video, iframe, a:has(img, video, iframe)"),
-      );
-      items.forEach(ensureBlockUi);
+      if (!editor) return;
+
+      // 1. Process all top-level figures (ignore nested figures)
+      const figures = Array.from(editor.querySelectorAll<HTMLElement>("figure"));
+      figures.forEach((fig) => {
+        if (fig.parentElement?.closest("figure")) {
+          // If a figure was accidentally nested inside another figure, strip duplicate wrapper
+          fig.removeAttribute("data-art-block");
+          fig.querySelectorAll(".art-inline-row, .art-inline-remove").forEach((r) => r.remove());
+          return;
+        }
+        setupFigureBlock(fig);
+      });
+
+      // 2. Only wrap TRULY BARE media elements that are NOT inside ANY figure (no anchor wrapping):
+      const bareMedia = Array.from(
+        editor.querySelectorAll<HTMLElement>(
+          "video, iframe, blockquote.twitter-tweet, blockquote.instagram-media, blockquote.fb-post, blockquote.tiktok-embed",
+        ),
+      ).filter((el) => !el.closest("figure"));
+
+      bareMedia.forEach((el) => {
+        wrapBareMedia(el);
+      });
     }
 
     function removeBlock(block: HTMLElement) {
@@ -843,7 +835,6 @@ function RichTextEditor({
     }
 
     // Inventory on mount + after DOM changes (insert/upload complete adds nodes etc.)
-    const ignoreMutation = { ignore: false };
     let pendingSync = 0;
     function scheduleSync() {
       if (pendingSync) return;
@@ -854,26 +845,48 @@ function RichTextEditor({
         } catch {}
       }, 120);
     }
-    const io = new MutationObserver(() => {
-      if (ignoreMutation.ignore) return;
-      reInventory();
+
+    let isInventorying = false;
+    const io = new MutationObserver((mutations) => {
+      if (isInventorying) return;
+
+      // Ignore mutations that only touch our internal remove buttons / rows
+      const onlyUiMutations = mutations.every((m) => {
+        const changedNodes = [...Array.from(m.addedNodes), ...Array.from(m.removedNodes)];
+        return (
+          changedNodes.length > 0 &&
+          changedNodes.every((node) => {
+            if (node.nodeType === 1) {
+              const el = node as HTMLElement;
+              return (
+                el.classList?.contains("art-inline-row") ||
+                el.classList?.contains("art-inline-remove") ||
+                el.getAttribute?.("data-art-remove") === "1"
+              );
+            }
+            return false;
+          })
+        );
+      });
+      if (onlyUiMutations) return;
+
+      // Disconnect observer during inventory to PREVENT ANY RECURSIVE LOOP
+      isInventorying = true;
+      io.disconnect();
+      try {
+        inventoryAll();
+      } finally {
+        io.observe(editor, { childList: true, subtree: true });
+        isInventorying = false;
+      }
       scheduleSync();
     });
-    function reInventory() {
-      ignoreMutation.ignore = true;
-      try {
-        requestAnimationFrame(() => {
-          inventoryAll();
-          ignoreMutation.ignore = false;
-        });
-      } finally {
-        // ignore flag cleared in rAF
-      }
-    }
+
     io.observe(editor, { childList: true, subtree: true });
     inventoryAll();
+
+    // While typing normal text, only sync value - do not re-scan or rebuild UI!
     editor.addEventListener("input", () => {
-      reInventory();
       scheduleSync();
     });
 
@@ -968,10 +981,10 @@ function RichTextEditor({
     function onPaste(e: ClipboardEvent) {
       try {
         // Prefer rich text/html from clipboard; if absent, fall back to
-        // default plaintext paste behavior (browser handles it, we just reInventory)
+        // default plaintext paste behavior (browser handles it, we just inventoryAll)
         const html = e.clipboardData?.getData("text/html");
         if (!html) {
-          setTimeout(reInventory, 80);
+          setTimeout(inventoryAll, 80);
           return;
         }
         e.preventDefault();
@@ -1008,9 +1021,9 @@ function RichTextEditor({
           }
         }
         syncValue();
-        setTimeout(reInventory, 120);
+        setTimeout(inventoryAll, 80);
       } catch {
-        setTimeout(reInventory, 80);
+        setTimeout(inventoryAll, 80);
       }
     }
     editor.addEventListener("paste", onPaste);
@@ -1036,9 +1049,14 @@ function RichTextEditor({
     }
     editor.addEventListener("keydown", onKeyDown, true);
 
+    function onInput() {
+      scheduleSync();
+    }
+    editor.addEventListener("input", onInput);
+
     return () => {
       io.disconnect();
-      editor.removeEventListener("input", reInventory);
+      editor.removeEventListener("input", onInput);
       editor.removeEventListener("paste", onPaste);
       editor.removeEventListener("keydown", onKeyDown, true);
       attachedBtnsRef.current.forEach((b) => b.remove());
@@ -1341,7 +1359,7 @@ function RichTextEditor({
     return uploadMany([file]);
   }
 
-  function insertVideoEmbed() {
+  function openEmbedModal() {
     editorRef.current?.focus();
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
@@ -1349,126 +1367,117 @@ function RichTextEditor({
     } else {
       savedRangeRef.current = null;
     }
-    setVideoModal({
+    setEmbedModal({
       isOpen: true,
       url: "",
     });
   }
 
-  function handleApplyVideo() {
-    const url = videoModal.url.trim();
-    if (!url) {
-      toast.error("Please enter a video URL.");
-      return;
+  function parseUniversalEmbed(input: string): { html: string; platform: string } | null {
+    const trimmed = (input || "").trim();
+    if (!trimmed) return null;
+
+    // 1. Raw <iframe> pasted directly (from any site / platform)
+    if (/<iframe\b[^>]*src="([^"]+)"[^>]*>[\s\S]*?<\/iframe>/i.test(trimmed)) {
+      const srcMatch = trimmed.match(/src="([^"]+)"/i);
+      const src = srcMatch ? srcMatch[1] : "";
+      const isVertical = /\/shorts\//i.test(src) || /tiktok\.com/i.test(src) || /\/reel\//i.test(src);
+      const isAudio = /spotify\.com/i.test(src) || /soundcloud\.com/i.test(src);
+      const containerClass = isAudio
+        ? "w-full max-w-[540px] my-2"
+        : isVertical
+          ? "aspect-[9/16] w-full max-w-[340px]"
+          : "aspect-video w-full max-w-[540px]";
+      const cleanIframe = trimmed
+        .replace(/width="[^"]*"/gi, 'width="100%"')
+        .replace(/height="[^"]*"/gi, isAudio ? 'height="152"' : 'height="100%"')
+        .replace(/style="[^"]*"/gi, 'style="border:0; width:100%; height:100%;"');
+      return {
+        platform: "Custom Embed",
+        html:
+          `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+          `<div class="${containerClass} mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">` +
+          cleanIframe +
+          `</div></figure><p><br></p>`,
+      };
     }
-    const embed = (() => {
-      try {
-        const u = new URL(url);
-        const host = u.hostname.replace(/^www\./, "");
-        if (
-          host === "youtube.com" ||
-          host === "m.youtube.com" ||
-          host === "music.youtube.com" ||
-          host === "youtu.be"
-        ) {
-          const videoId = (() => {
-            if (host === "youtu.be") return u.pathname.split("/").filter(Boolean)[0] || null;
-            if (u.pathname === "/watch") return u.searchParams.get("v");
-            if (u.pathname.startsWith("/shorts/") || u.pathname.startsWith("/embed/")) {
-              return u.pathname.split("/").filter(Boolean)[1] || null;
-            }
-            return null;
-          })();
-          if (!videoId) return null;
-          return {
-            tag: "iframe",
-            src: `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`,
-            title: "YouTube video",
-          };
-        }
-        if (host === "vimeo.com") {
-          const id = u.pathname.split("/").filter(Boolean).pop();
-          if (!id || !/^\d+$/.test(id)) return null;
-          return {
-            tag: "iframe",
-            src: `https://player.vimeo.com/video/${id}`,
-            title: "Vimeo video",
-          };
-        }
-        if (host === "youtube-nocookie.com" || host === "player.vimeo.com") {
-          return {
-            tag: "iframe",
-            src: u.toString(),
-            title: "Embedded video",
-          };
-        }
-        return null;
-      } catch {
-        return null;
+
+    // 2. Extract URL from <blockquote> or tags if user pasted embed HTML snippet
+    let cleanUrl = trimmed;
+    if (
+      cleanUrl.includes("<blockquote") ||
+      cleanUrl.includes("data-instgrm-permalink") ||
+      cleanUrl.includes("data-embed-permalink")
+    ) {
+      const match =
+        cleanUrl.match(/data-instgrm-permalink="([^"]+)"/i) ||
+        cleanUrl.match(/data-embed-permalink="([^"]+)"/i) ||
+        cleanUrl.match(/cite="([^"]+)"/i) ||
+        cleanUrl.match(/href="([^"]+)"/i);
+      if (match) {
+        cleanUrl = match[1].replace(/^`|`$/g, "").replace(/&amp;/g, "&").trim();
       }
-    })();
-    if (!embed) {
-      toast.error("This video URL is not supported. Please paste a valid YouTube or Vimeo URL.");
-      return;
     }
-    if (savedRangeRef.current) {
-      const sel = window.getSelection();
-      sel?.removeAllRanges();
-      sel?.addRange(savedRangeRef.current);
-    }
-    editorRef.current?.focus();
-    const safeSrc = embed.src.replace(/"/g, "&quot;");
-    const safeTitle = (embed.title || "Video").replace(/"/g, "&quot;");
-    const isVertical = /\/shorts\//i.test(url) || /tiktok\.com/i.test(url) || /\/reel\//i.test(url);
-    const aspectClass = isVertical ? "aspect-[9/16] max-w-[320px]" : "aspect-video max-w-[500px]";
-    const html =
-      '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent">' +
-      `<div class="${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">` +
-      `<iframe src="${safeSrc}" title="${safeTitle}" class="h-full w-full block border-0 bg-transparent" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
-      "</div></figure><p><br></p>";
-    insertHtmlAtCursor(html);
-    setVideoModal({ isOpen: false, url: "" });
-    savedRangeRef.current = null;
-    toast.success("Video embed inserted!");
-  }
 
-  function insertPostEmbed() {
-    editorRef.current?.focus();
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
-      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
-    } else {
-      savedRangeRef.current = null;
-    }
-    setSocialModal({
-      isOpen: true,
-      url: "",
-    });
-  }
-
-  function handleApplySocial() {
-    const url = socialModal.url.trim();
-    if (!url) {
-      toast.error("Please enter a social post URL.");
-      return;
-    }
-    const normalized = url;
-    let parsed: URL | null = null;
+    let parsed: URL;
     try {
-      parsed = new URL(normalized);
+      parsed = new URL(cleanUrl);
     } catch {
-      toast.error("Please enter a valid URL.");
-      return;
+      return null;
     }
-    const host = parsed.hostname.replace(/^www\./, "");
+
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
     const permalink = parsed.toString().replace(/"/g, "&quot;");
 
-    if (savedRangeRef.current) {
-      const sel = window.getSelection();
-      sel?.removeAllRanges();
-      sel?.addRange(savedRangeRef.current);
+    // Instagram: posts, reels, stories, tv, share
+    if (host === "instagram.com" || host === "m.instagram.com" || host === "instagr.am") {
+      const pathOnly = parsed.pathname.replace(/\/+$/, "") + "/";
+      const isReel = pathOnly.startsWith("/reel/") || pathOnly.startsWith("/reels/");
+      const cleanLink = `https://www.instagram.com${pathOnly}`;
+      const maxW = isReel ? "380px" : "540px";
+      const minH = isReel ? "620px" : "560px";
+      return {
+        platform: isReel ? "Instagram Reel" : "Instagram Post",
+        html:
+          `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[${maxW}] mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1" data-is-reel="${isReel ? "true" : "false"}">` +
+          `<blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:${maxW}; min-width:326px; min-height:${minH}; padding:0; width:calc(100% - 2px); color-scheme:light;">` +
+          `<div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600;">View this ${isReel ? "reel" : "post"} on Instagram</a></div>` +
+          `</blockquote></figure><p><br></p>`,
+      };
     }
-    editorRef.current?.focus();
+
+    // Facebook: posts, videos, reels, watch, fb.watch, fb.com
+    if (
+      host === "facebook.com" ||
+      host.endsWith(".facebook.com") ||
+      host === "fb.watch" ||
+      host === "fb.com"
+    ) {
+      const isVideo =
+        permalink.includes("/videos/") ||
+        permalink.includes("/watch") ||
+        permalink.includes("fb.watch") ||
+        permalink.includes("/reel/") ||
+        permalink.includes("/reels/");
+      const isReel = permalink.includes("/reel/") || permalink.includes("/reels/");
+      const fbHref = encodeURIComponent(cleanUrl);
+      const iframeSrc = isVideo
+        ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto`
+        : `https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=auto`;
+      const containerClass = isReel
+        ? "aspect-[9/16] max-w-[340px]"
+        : isVideo
+          ? "aspect-video max-w-[500px]"
+          : "max-w-[480px]";
+      return {
+        platform: isReel ? "Facebook Reel" : isVideo ? "Facebook Video" : "Facebook Post",
+        html:
+          `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+          `<div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+          `<iframe src="${iframeSrc}" width="100%" height="${isReel || isVideo ? "100%" : "480"}" style="border: none; overflow: hidden; width: 100%; height: ${isReel || isVideo ? "100%" : "480px"}; min-height: ${isReel || isVideo ? "100%" : "250px"}; background: #ffffff;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen title="Facebook content" class="w-full mx-auto block bg-white"></iframe>` +
+          `</div></figure><p><br></p>`,
+      };
+    }
 
     // X / Twitter
     if (
@@ -1479,43 +1488,14 @@ function RichTextEditor({
     ) {
       const cleanPath = parsed.pathname.replace(/\/+$/, "") || "/";
       const safePermalink = `https://x.com${cleanPath}`.replace(/"/g, "&quot;");
-      const html =
-        '<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto max-w-full text-center">' +
-        `<blockquote class="twitter-tweet mx-auto" data-align="center" data-lang="en" data-dnt="true" data-embed-permalink="${safePermalink}">` +
-        `<p lang="en" dir="ltr"><a href="${safePermalink}">View post on X / Twitter</a></p>` +
-        "</blockquote></figure><p><br></p>";
-      insertHtmlAtCursor(html);
-      setSocialModal({ isOpen: false, url: "" });
-      savedRangeRef.current = null;
-      toast.success("X / Twitter post embedded.");
-      return;
-    }
-
-    // Instagram (p / reel / tv / stories)
-    if (host === "instagram.com" || host === "m.instagram.com" || host === "instagr.am") {
-      const pathOnly = parsed.pathname.replace(/\/+$/, "") + "/";
-      const valid =
-        pathOnly.startsWith("/p/") ||
-        pathOnly.startsWith("/reel/") ||
-        pathOnly.startsWith("/reels/") ||
-        pathOnly.startsWith("/tv/") ||
-        pathOnly.startsWith("/stories/");
-      if (!valid) {
-        toast.error("This Instagram link is not valid. Please paste a post, reel, or story URL.");
-        return;
-      }
-      const isReel = pathOnly.startsWith("/reel/") || pathOnly.startsWith("/reels/");
-      const cleanLink = `https://www.instagram.com${pathOnly}`;
-      const html =
-        '<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[460px] mx-auto text-center bg-white" style="max-height: 76vh; overflow-y: auto;">' +
-        `<blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:440px; min-width:300px; padding:0; width:calc(100% - 2px); color-scheme:light;">` +
-        `<a href="${cleanLink}" target="_blank" rel="noopener noreferrer">View this ${isReel ? "reel" : "post"} on Instagram</a>` +
-        "</blockquote></figure><p><br></p>";
-      insertHtmlAtCursor(html);
-      setSocialModal({ isOpen: false, url: "" });
-      savedRangeRef.current = null;
-      toast.success(isReel ? "Instagram Reel embedded." : "Instagram post embedded.");
-      return;
+      return {
+        platform: "X / Twitter Post",
+        html:
+          `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto max-w-full text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+          `<blockquote class="twitter-tweet mx-auto" data-align="center" data-lang="en" data-dnt="true" data-embed-permalink="${safePermalink}">` +
+          `<p lang="en" dir="ltr"><a href="${safePermalink}">View post on X / Twitter</a></p>` +
+          `</blockquote></figure><p><br></p>`,
+      };
     }
 
     // TikTok
@@ -1526,58 +1506,21 @@ function RichTextEditor({
         parsed.pathname.match(/\/video\/(\d+)/)?.[1] ||
         parsed.pathname.match(/\/v\/(\d+)/)?.[1] ||
         null;
-      const html = directId
-        ? '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
-          '<div class="w-full max-w-[325px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">' +
-          `<iframe src="https://www.tiktok.com/embed/v2/${directId}" title="TikTok video" class="w-full block border-0 bg-white" style="height: 580px; min-height: 580px; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe>` +
-          "</div></figure><p><br></p>"
-        : '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
-          `<blockquote class="tiktok-embed mx-auto" cite="${safePermalink}" data-video-id="" data-embed-type="tiktok" data-embed-permalink="${safePermalink}" style="max-width: 325px; min-width: 260px; margin: 0 auto; background: #ffffff;">` +
-          `<section><a target="_blank" rel="noopener noreferrer nofollow" href="${safePermalink}">View post on TikTok</a></section>` +
-          "</blockquote></figure><p><br></p>";
-      insertHtmlAtCursor(html);
-      setSocialModal({ isOpen: false, url: "" });
-      savedRangeRef.current = null;
-      toast.success("TikTok post embedded.");
-      return;
+      return {
+        platform: "TikTok Video",
+        html: directId
+          ? `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+            `<div class="w-full max-w-[340px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+            `<iframe src="https://www.tiktok.com/embed/v2/${directId}" title="TikTok video" class="w-full block border-0 bg-white" style="height: 580px; min-height: 580px; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe>` +
+            `</div></figure><p><br></p>`
+          : `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+            `<blockquote class="tiktok-embed mx-auto" cite="${safePermalink}" data-video-id="" data-embed-type="tiktok" data-embed-permalink="${safePermalink}" style="max-width: 325px; min-width: 260px; margin: 0 auto; background: #ffffff;">` +
+            `<section><a target="_blank" rel="noopener noreferrer nofollow" href="${safePermalink}">View post on TikTok</a></section>` +
+            `</blockquote></figure><p><br></p>`,
+      };
     }
 
-    // Facebook / FB post or video
-    if (
-      host === "facebook.com" ||
-      host.endsWith(".facebook.com") ||
-      host === "fb.watch" ||
-      host === "fb.com"
-    ) {
-      const safePermalink = permalink;
-      const isVideo =
-        safePermalink.includes("/videos/") ||
-        safePermalink.includes("/watch") ||
-        safePermalink.includes("fb.watch") ||
-        safePermalink.includes("/reel/");
-      const isReel = safePermalink.includes("/reel/") || safePermalink.includes("/reels/");
-      const fbHref = encodeURIComponent(safePermalink);
-      const iframeSrc = isVideo
-        ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto`
-        : `https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=auto`;
-      const containerClass = isReel
-        ? "aspect-[9/16] max-w-[320px]"
-        : isVideo
-          ? "aspect-video max-w-[480px]"
-          : "max-w-[440px]";
-      const html =
-        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
-        `<div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
-        `<iframe src="${iframeSrc}" width="100%" height="${isReel || isVideo ? "100%" : "480"}" style="border: none; overflow: hidden; width: 100%; height: ${isReel || isVideo ? "100%" : "480px"}; min-height: ${isReel || isVideo ? "100%" : "250px"}; background: #ffffff;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen title="Facebook content" class="w-full mx-auto block bg-white"></iframe>` +
-        "</div></figure><p><br></p>";
-      insertHtmlAtCursor(html);
-      setSocialModal({ isOpen: false, url: "" });
-      savedRangeRef.current = null;
-      toast.success(isVideo ? "Facebook video embedded." : "Facebook post embedded.");
-      return;
-    }
-
-    // YouTube video / shorts (fallback)
+    // YouTube / Shorts / Music / youtu.be
     if (
       host === "youtube.com" ||
       host === "m.youtube.com" ||
@@ -1588,35 +1531,140 @@ function RichTextEditor({
       const videoId = (() => {
         if (host === "youtu.be") return parsed.pathname.split("/").filter(Boolean)[0] || null;
         if (parsed.pathname === "/watch") return parsed.searchParams.get("v");
-        if (parsed.pathname.startsWith("/shorts/") || parsed.pathname.startsWith("/embed/")) {
+        if (
+          parsed.pathname.startsWith("/shorts/") ||
+          parsed.pathname.startsWith("/embed/") ||
+          parsed.pathname.startsWith("/live/")
+        ) {
           return parsed.pathname.split("/").filter(Boolean)[1] || null;
         }
         return null;
       })();
-      if (!videoId) {
-        toast.error(
-          "This YouTube URL is not valid. Please use the Insert video URL button instead.",
-        );
-        return;
+      if (videoId) {
+        const src = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`.replace(/"/g, "&quot;");
+        const isVertical = parsed.pathname.startsWith("/shorts/") || parsed.pathname.includes("/shorts/");
+        const aspectClass = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video max-w-[540px]";
+        return {
+          platform: isVertical ? "YouTube Shorts" : "YouTube Video",
+          html:
+            `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+            `<div class="${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+            `<iframe src="${src}" title="YouTube video" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
+            `</div></figure><p><br></p>`,
+        };
       }
-      const src = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`.replace(/"/g, "&quot;");
-      const isVertical = parsed.pathname.startsWith("/shorts/") || parsed.pathname.includes("/shorts/");
-      const aspectClass = isVertical ? "aspect-[9/16] max-w-[320px]" : "aspect-video max-w-[500px]";
-      const html =
-        '<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
-        `<div class="${aspectClass} w-full mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
-        `<iframe src="${src}" title="YouTube video" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>` +
-        "</div></figure><p><br></p>";
-      insertHtmlAtCursor(html);
-      setSocialModal({ isOpen: false, url: "" });
-      savedRangeRef.current = null;
-      toast.success("YouTube video embedded.");
+    }
+
+    // Threads
+    if (host === "threads.net" || host.endsWith(".threads.net")) {
+      const cleanPath = parsed.pathname.replace(/\/+$/, "");
+      const safePermalink = `https://www.threads.net${cleanPath}`.replace(/"/g, "&quot;");
+      return {
+        platform: "Threads Post",
+        html:
+          `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[500px] text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+          `<div class="w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-left">` +
+          `<div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Threads Post</div>` +
+          `<a href="${safePermalink}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-black hover:underline block break-all">View this post on Threads</a>` +
+          `</div></figure><p><br></p>`,
+      };
+    }
+
+    // Vimeo
+    if (host === "vimeo.com" || host === "player.vimeo.com") {
+      const id = parsed.pathname.split("/").filter(Boolean).pop();
+      if (id && /^\d+$/.test(id)) {
+        return {
+          platform: "Vimeo Video",
+          html:
+            `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+            `<div class="aspect-video w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+            `<iframe src="https://player.vimeo.com/video/${id}" title="Vimeo video" class="h-full w-full block border-0 bg-white" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>` +
+            `</div></figure><p><br></p>`,
+        };
+      }
+    }
+
+    // Spotify
+    if (host === "open.spotify.com" || host === "spotify.com") {
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      const type = parts[0];
+      const id = parts[1];
+      if (type && id) {
+        const isCompact = type === "track" || type === "episode";
+        const height = isCompact ? "152" : "352";
+        return {
+          platform: "Spotify Audio",
+          html:
+            `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[540px] text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+            `<div class="w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+            `<iframe src="https://open.spotify.com/embed/${type}/${id}" width="100%" height="${height}" frameBorder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" class="w-full block"></iframe>` +
+            `</div></figure><p><br></p>`,
+        };
+      }
+    }
+
+    // SoundCloud
+    if (host === "soundcloud.com" || host.endsWith(".soundcloud.com")) {
+      return {
+        platform: "SoundCloud Audio",
+        html:
+          `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[540px] text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+          `<div class="w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
+          `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(permalink)}&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false"></iframe>` +
+          `</div></figure><p><br></p>`,
+      };
+    }
+
+    // Pinterest
+    if (host === "pinterest.com" || host.endsWith(".pinterest.com") || host === "pin.it") {
+      return {
+        platform: "Pinterest Pin",
+        html:
+          `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[440px] text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+          `<div class="w-full max-w-[440px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-left">` +
+          `<div class="text-xs font-bold text-red-600 uppercase tracking-wider mb-2">Pinterest Pin</div>` +
+          `<a href="${permalink}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-black hover:underline block break-all">View this Pin on Pinterest</a>` +
+          `</div></figure><p><br></p>`,
+      };
+    }
+
+    // Generic fallback: embed as clean responsive card
+    return {
+      platform: "Embedded Link",
+      html:
+        `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[480px] text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+        `<div class="w-full max-w-[480px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-left">` +
+        `<div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Embedded Media (${host})</div>` +
+        `<a href="${permalink}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-black hover:underline block break-all">${permalink}</a>` +
+        `</div></figure><p><br></p>`,
+    };
+  }
+
+  function handleApplyEmbed() {
+    const raw = embedModal.url.trim();
+    if (!raw) {
+      toast.error("Please enter a link or embed code.");
       return;
     }
 
-    toast.error(
-      "This post URL is not supported yet. Supported platforms: X / Twitter, Instagram, TikTok, Facebook, YouTube.",
-    );
+    const res = parseUniversalEmbed(raw);
+    if (!res) {
+      toast.error("Please enter a valid social post, video URL, or embed code.");
+      return;
+    }
+
+    if (savedRangeRef.current) {
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(savedRangeRef.current);
+    }
+    editorRef.current?.focus();
+
+    insertHtmlAtCursor(res.html);
+    setEmbedModal({ isOpen: false, url: "" });
+    savedRangeRef.current = null;
+    toast.success(`${res.platform} embedded!`);
   }
 
   return (
@@ -1656,14 +1704,14 @@ function RichTextEditor({
             onClick={insertImageInline}
           />
           <ToolbarButton
-            label="Insert video URL (YouTube/Vimeo)"
-            icon={VideoIcon}
-            onClick={insertVideoEmbed}
+            label="Embed post or video (Instagram, Facebook, X, YouTube, TikTok...)"
+            icon={PostEmbedIcon}
+            onClick={openEmbedModal}
           />
           <ToolbarButton
-            label="Embed social post (X/Instagram/TikTok/Facebook)"
-            icon={PostEmbedIcon}
-            onClick={insertPostEmbed}
+            label="Insert video / media URL"
+            icon={VideoIcon}
+            onClick={openEmbedModal}
           />
         </ToolbarGroup>
       </div>
@@ -1677,9 +1725,8 @@ function RichTextEditor({
       />
       <div className="border-t border-gray-200 bg-gray-50 px-3 py-2 text-xs text-muted-foreground">
         Tip: Select text and use Add link to insert hyperlinks. Use the Image button to upload files
-        or paste a URL — HD images up to 2560px are preserved. Video embed supports YouTube and
-        Vimeo. Use Embed social post to insert posts from X, Instagram, TikTok, and Facebook
-        directly between paragraphs.
+        or paste a URL. Use Embed post or video to insert content from Instagram, Facebook,
+        X / Twitter, YouTube, TikTok, Threads, or Vimeo directly between paragraphs.
       </div>
 
       {linkModal.isOpen && (
@@ -1777,146 +1824,87 @@ function RichTextEditor({
         </div>
       )}
 
-      {videoModal.isOpen && (
+      {embedModal.isOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
-              setVideoModal({ isOpen: false, url: "" });
+              setEmbedModal({ isOpen: false, url: "" });
             }
           }}
         >
           <div
-            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-2xl"
+            className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-2xl"
             role="dialog"
             aria-modal="true"
           >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
-                <VideoIcon className="h-4 w-4" /> Insert Video Embed
+                <PostEmbedIcon className="h-4 w-4" /> Embed Post or Video
               </h3>
               <button
                 type="button"
-                onClick={() => setVideoModal({ isOpen: false, url: "" })}
+                onClick={() => setEmbedModal({ isOpen: false, url: "" })}
                 className="text-gray-400 hover:text-black p-1 text-sm font-bold"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-4 space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                Video URL (YouTube or Vimeo) <span className="text-red-600">*</span>
-              </label>
-              <input
-                autoFocus
-                type="url"
-                value={videoModal.url}
-                onChange={(e) => setVideoModal({ isOpen: true, url: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleApplyVideo();
-                  } else if (e.key === "Escape") {
-                    e.preventDefault();
-                    setVideoModal({ isOpen: false, url: "" });
-                  }
-                }}
-                placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
-              />
-              <p className="text-xs text-gray-500">
-                YouTube watch links, Shorts, and Vimeo URLs will be inserted as responsive 16:9 videos.
-              </p>
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-2.5">
+                <span className="bg-pink-100 text-pink-700 px-2 py-0.5 rounded">Instagram</span>
+                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Facebook</span>
+                <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded">X / Twitter</span>
+                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded">YouTube</span>
+                <span className="bg-neutral-900 text-white px-2 py-0.5 rounded">TikTok</span>
+                <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded">Threads</span>
+                <span className="bg-sky-100 text-sky-700 px-2 py-0.5 rounded">Vimeo</span>
+                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Spotify</span>
+                <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded">Embed Code</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Post, Video URL or Embed Code <span className="text-red-600">*</span>
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={embedModal.url}
+                  onChange={(e) => setEmbedModal({ isOpen: true, url: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleApplyEmbed();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setEmbedModal({ isOpen: false, url: "" });
+                    }
+                  }}
+                  placeholder="Paste Instagram, Facebook, X, YouTube, TikTok, Threads link or embed code..."
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black font-sans"
+                />
+                <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                  Supports posts & reels from Instagram, Facebook, X (Twitter), YouTube (videos & Shorts), TikTok, Threads, Vimeo, Spotify, or any custom &lt;iframe&gt; embed code.
+                </p>
+              </div>
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setVideoModal({ isOpen: false, url: "" })}
+                onClick={() => setEmbedModal({ isOpen: false, url: "" })}
                 className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-gray-100"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleApplyVideo}
+                onClick={handleApplyEmbed}
                 className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800"
               >
-                Insert Video
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {socialModal.isOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setSocialModal({ isOpen: false, url: "" });
-            }
-          }}
-        >
-          <div
-            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
-                <PostEmbedIcon className="h-4 w-4" /> Embed Social Post
-              </h3>
-              <button
-                type="button"
-                onClick={() => setSocialModal({ isOpen: false, url: "" })}
-                className="text-gray-400 hover:text-black p-1 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                Post URL <span className="text-red-600">*</span>
-              </label>
-              <input
-                autoFocus
-                type="url"
-                value={socialModal.url}
-                onChange={(e) => setSocialModal({ isOpen: true, url: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleApplySocial();
-                  } else if (e.key === "Escape") {
-                    e.preventDefault();
-                    setSocialModal({ isOpen: false, url: "" });
-                  }
-                }}
-                placeholder="https://x.com/... or https://www.instagram.com/p/..."
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
-              />
-              <p className="text-xs text-gray-500">
-                Supports posts and reels from X (Twitter), Instagram, TikTok, and Facebook.
-              </p>
-            </div>
-
-            <div className="mt-6 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setSocialModal({ isOpen: false, url: "" })}
-                className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleApplySocial}
-                className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800"
-              >
-                Embed Post
+                Insert Embed
               </button>
             </div>
           </div>

@@ -32,6 +32,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
   const isSettingsActive = path.startsWith("/admin/settings");
   const isSocialsActive = path.startsWith("/admin/socials");
   const isPrivacyActive = path.startsWith("/admin/privacy");
+  const isContactActive = path.startsWith("/admin/contact");
 
   useEffect(() => {
     onClose?.();
@@ -95,6 +96,9 @@ export function AdminSidebar({ open = false, onClose }: Props) {
         </Link>
         <Link to="/admin/privacy" className={`mb-2 block ${linkClass(isPrivacyActive)}`}>
           Privacy Policy
+        </Link>
+        <Link to="/admin/contact" className={`mb-2 block ${linkClass(isContactActive)}`}>
+          Contact Page
         </Link>
         <Link
           to="/"
