@@ -69,10 +69,8 @@ export function normalizeArticleMedia(a: Article): Article {
     const abs = /https?:\/\/aliceblue-goose-490382\.hostingersite\.com\/api\/uploads\//gi;
     if (IS_DEV_BUILD) {
       body = body.replace(abs, "/api/uploads/");
-    } else {
-      // Production: leave absolute URLs unchanged (backend CORS handles it).
-      body = body;
     }
+    // Production: leave absolute URLs unchanged (backend CORS handles it).
   } else if (typeof body === "string" && IS_DEV_BUILD === false) {
     // Body had relative /api/uploads/ — rewrite to absolute origin for prod.
     body = body.replace(/(["'])\/api\/uploads\//gi, `$1${PROD_BACKEND_ORIGIN}/api/uploads/`);
