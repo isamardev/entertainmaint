@@ -389,36 +389,25 @@ function formatArticleBody(body: string) {
     },
   );
 
-  // Normalize existing iframe figures (both vertical and horizontal, all social platforms)
+  // 1. Unwrap any pre-existing figure/div wrappers around iframes to prevent nested figures
   enriched = enriched.replace(
-    /<figure[^>]*>\s*<div[^>]*class="[^"]*(?:aspect-video|aspect-\[9\/16\]|w-full)[^"]*"[^>]*>\s*(<iframe\b[^>]*src="([^"]*)"[^>]*>[\s\S]*?<\/iframe>)\s*<\/div>\s*<\/figure>/gi,
-    (_m, iframeTag, src) => {
-      if (/instagram\.com/i.test(src)) {
-        const cleanLink = src.replace(/\/embed\/.*$/i, "").replace(/\/+$/, "") + "/";
-        const isReel = /reels?/i.test(cleanLink);
-        const maxW = isReel ? "380px" : "540px";
-        const minH = isReel ? "620px" : "560px";
-        return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[${maxW}] mx-auto text-center bg-transparent" data-is-reel="${isReel ? "true" : "false"}"><blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:${maxW}; min-width:326px; min-height:${minH}; padding:0; width:calc(100% - 2px); color-scheme:light;"><div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600;">View this ${isReel ? "reel" : "post"} on Instagram</a></div></blockquote></figure>`;
-      }
-      if (/facebook\.com/i.test(src)) {
-        const isReel = /reel/i.test(src);
-        const isVideo = /video/i.test(src);
-        const containerClass = isReel ? "aspect-[9/16] max-w-[340px]" : isVideo ? "aspect-video max-w-[500px]" : "max-w-[480px]";
-        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${iframeTag}</div></figure>`;
-      }
-      if (/spotify\.com/i.test(src) || /soundcloud\.com/i.test(src)) {
-        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[540px] text-center bg-transparent"><div class="w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${iframeTag}</div></figure>`;
-      }
-      const isVertical = /\/shorts\//i.test(src) || /tiktok\.com/i.test(src) || /\/reel\//i.test(src);
-      if (isVertical) {
-        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-[9/16] w-full max-w-[340px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
-      }
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-video w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
-    },
+    /<figure\b[^>]*>\s*(?:<div\b[^>]*>)?\s*(<iframe\b[\s\S]*?<\/iframe>)\s*(?:<\/div>)?\s*<\/figure>/gi,
+    "$1",
   );
 
-  // Wrap bare (non-figured) iframes in responsive wrapper (detect vertical vs horizontal, bg-transparent)
-  enriched = enriched.replace(/(<iframe\b[^>]*src="([^"]*)"[^>]*>[\s\S]*?<\/iframe>)/gi, (iframeTag, src) => {
+  // 2. Wrap iframes cleanly with responsive containers according to platform/aspect ratio
+  enriched = enriched.replace(/<iframe\b[\s\S]*?<\/iframe>/gi, (fullIframeTag) => {
+    const srcMatch =
+      fullIframeTag.match(/\ssrc="([^"]+)"/i) || fullIframeTag.match(/\ssrc='([^']+)'/i);
+    let src = srcMatch ? srcMatch[1].trim() : "";
+    if (!src) return fullIframeTag;
+
+    // Safety: if src was corrupted with an embedded <iframe or quotes, extract the real URL
+    const realUrlMatch = src.match(/https?:\/\/[^\s"'>]+/i);
+    if (realUrlMatch) {
+      src = realUrlMatch[0];
+    }
+
     if (/instagram\.com/i.test(src)) {
       const cleanLink = src.replace(/\/embed\/.*$/i, "").replace(/\/+$/, "") + "/";
       const isReel = /reels?/i.test(cleanLink);
@@ -426,19 +415,29 @@ function formatArticleBody(body: string) {
       const minH = isReel ? "620px" : "560px";
       return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[${maxW}] mx-auto text-center bg-transparent" data-is-reel="${isReel ? "true" : "false"}"><blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:${maxW}; min-width:326px; min-height:${minH}; padding:0; width:calc(100% - 2px); color-scheme:light;"><div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600;">View this ${isReel ? "reel" : "post"} on Instagram</a></div></blockquote></figure>`;
     }
+
     if (/facebook\.com/i.test(src)) {
       const isReel = /reel/i.test(src);
       const isVideo = /video/i.test(src);
-      const containerClass = isReel ? "aspect-[9/16] max-w-[340px]" : isVideo ? "aspect-video max-w-[500px]" : "max-w-[480px]";
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${iframeTag}</div></figure>`;
+      const containerClass = isReel
+        ? "aspect-[9/16] max-w-[340px]"
+        : isVideo
+          ? "aspect-video max-w-[500px]"
+          : "max-w-[480px]";
+      const cleanIframe = fullIframeTag.replace(/\ssrc="[^"]*"/i, ` src="${src}"`);
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${cleanIframe}</div></figure>`;
     }
+
     if (/spotify\.com/i.test(src) || /soundcloud\.com/i.test(src)) {
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[540px] text-center bg-transparent"><div class="w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${iframeTag}</div></figure>`;
+      const cleanIframe = fullIframeTag.replace(/\ssrc="[^"]*"/i, ` src="${src}"`);
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[540px] text-center bg-transparent"><div class="w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${cleanIframe}</div></figure>`;
     }
+
     const isVertical = /\/shorts\//i.test(src) || /tiktok\.com/i.test(src) || /\/reel\//i.test(src);
     if (isVertical) {
       return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-[9/16] w-full max-w-[340px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
     }
+
     return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-video w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
   });
 
