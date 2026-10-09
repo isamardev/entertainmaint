@@ -370,6 +370,35 @@ figure.inline-embed img:not([class*="avatar"]) {
   border-radius: 0.75rem !important;
 }
 
+/* Article body images - Constrain height to 80-90vh (85vh), centered, object-contain */
+.article-body img:not([class*="avatar"]),
+.article-body figure img:not([class*="avatar"]),
+.prose img:not([class*="avatar"]),
+.art-rich-editor figure img,
+.art-rich-editor img:not([class*="avatar"]) {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 85vh !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  display: block !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.article-body figure,
+.prose figure,
+.art-rich-editor figure {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
 /* Native HTML5 video player overrides - eliminate black pillarbox background surfaces */
 video.social-media-item,
 .social-embed-media-wrapper video {

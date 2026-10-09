@@ -475,12 +475,39 @@ function formatArticleBody(body: string) {
   enriched = enriched.replace(embedBQRe, (_m: string, bq: string) => wrapEmbed(bq));
   enriched = enriched.replace(standaloneBQRe, (_m: string, bq: string) => wrapEmbed(bq));
 
-  // Ensure inline images outside figures look good too
+  // Normalize inline body images: constrain height to 80-90vh (85vh), centered, object-contain
+  enriched = enriched.replace(
+    /<img\b([^>]*?)(\/?>)/gi,
+    (_full, attrs, closing) => {
+      if (/avatar|icon|emoji/i.test(attrs)) return _full;
+      let cleanAttrs = attrs;
+      if (/class="/i.test(cleanAttrs)) {
+        cleanAttrs = cleanAttrs.replace(
+          /class="([^"]*)"/i,
+          (_clsMatch: string, currClass: string) => {
+            const stripped = currClass
+              .split(/\s+/)
+              .filter((c: string) => !/^(w-full|max-w-full|max-h-|h-)/.test(c))
+              .join(" ");
+            return `class="${stripped ? stripped + " " : ""}max-h-[85vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block"`;
+          },
+        );
+      } else {
+        cleanAttrs = ` class="max-h-[85vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block"${cleanAttrs}`;
+      }
+      if (!/loading=/i.test(cleanAttrs)) {
+        cleanAttrs += ' loading="lazy"';
+      }
+      return `<img${cleanAttrs}${closing}`;
+    },
+  );
+
+  // Ensure inline images outside figures look good and are centered inside figures too
   enriched = enriched.replace(
     /(<img\b[^>]*>)(?!\s*<\/figcaption>|<\/a><\/figure>|<\/source>|<\/video>)/gi,
     (_m, img) => {
-      if (/class="[^"]*w-full/.test(img) || /<figure[\s\S]*$/i.test(img)) return img;
-      return `<figure class="my-6 flex flex-col items-center bg-white">${img.replace(/^<img\b/i, '<img class="w-full max-w-full rounded border border-gray-200 bg-white" loading="lazy"')}</figure>`;
+      if (/<figure[\s\S]*$/i.test(img)) return img;
+      return `<figure class="my-6 flex flex-col items-center justify-center bg-transparent w-full">${img}</figure>`;
     },
   );
 

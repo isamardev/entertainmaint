@@ -1156,8 +1156,8 @@ function RichTextEditor({
     const safeAlt = String(alt || "").replace(/"/g, "&quot;");
     const safeSrc = String(src).replace(/"/g, "&quot;");
     return (
-      '<figure class="my-6 flex flex-col items-center bg-white">' +
-      `<img src="${safeSrc}" alt="${safeAlt}" class="w-full max-w-full rounded border border-gray-200 bg-white" loading="lazy" />` +
+      '<figure class="my-6 flex flex-col items-center justify-center bg-white">' +
+      `<img src="${safeSrc}" alt="${safeAlt}" class="max-h-[85vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block" loading="lazy" />` +
       "</figure><p><br></p>"
     );
   }
