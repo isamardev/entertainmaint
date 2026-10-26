@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Play } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { articleService } from "@/services/articleService";
 import { ArticleCard } from "@/components/site/ArticleCard";
 import { ShareButtons } from "@/components/site/ShareButtons";
-import { TrendingSidebar } from "@/components/site/Sidebar";
+import { TrendingSidebar, SmartStickySidebar } from "@/components/site/Sidebar";
 import { shortDate } from "@/lib/format";
 
 export const Route = createFileRoute("/article/$slug")({
@@ -67,16 +67,65 @@ export const Route = createFileRoute("/article/$slug")({
   component: ArticlePage,
 });
 
+/**
+ * Normalizes any Instagram reel URL (/reel/CODE/ or /reels/CODE/) into the standard
+ * canonical post URL (https://www.instagram.com/p/CODE/).
+ * 
+ * Crucial reason:
+ * When Instagram's official embed.js processes a `/reel/` URL, it renders a stripped-down
+ * "Reels Player" iframe which hides likes, comments, caption, and account header, and can
+ * distort horizontal/square reels into fixed 9:16 vertical boxes.
+ * When processed as `/p/CODE/`, Instagram renders the full official responsive embed with
+ * account avatar, follow button, native aspect ratio player, likes, comments, and full caption.
+ */
+/**
+ * Extracts Instagram shortcode from /p/, /reel/, /reels/, /tv/, or /share/p/ URLs.
+ */
+export function extractInstagramShortcode(url: string): string | null {
+  if (!url) return null;
+  const clean = url.trim().replace(/^[`"']+|[`"']+$/g, "");
+  const match = clean.match(/instagram\.com\/(?:p|reel|reels|tv|share\/p)\/([A-Za-z0-9_-]+)/i);
+  return match && match[1] ? match[1] : null;
+}
+
+export function normalizeInstagramUrl(url: string): string {
+  if (!url) return url;
+  const shortcode = extractInstagramShortcode(url);
+  if (shortcode) {
+    return `https://www.instagram.com/p/${shortcode}/`;
+  }
+  return url.trim().replace(/^[`"']+|[`"']+$/g, "");
+}
+
+export function formatCaptionHtml(caption?: string | null): string {
+  if (!caption) return "";
+  const escape = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safe = escape(caption);
+  return safe
+    .replace(
+      /(#[a-zA-Z0-9_\u0080-\uFFFF]+)/g,
+      '<span class="text-[#00376b] font-medium hover:underline cursor-pointer">$1</span>',
+    )
+    .replace(
+      /(@[a-zA-Z0-9_.]+)/g,
+      '<span class="text-[#00376b] font-medium hover:underline cursor-pointer">$1</span>',
+    )
+}
+
 function ArticlePage() {
   const { article } = Route.useLoaderData();
   const proseRef = useRef<HTMLDivElement | null>(null);
+  const [moreStoriesCount, setMoreStoriesCount] = useState(6);
+  const [isLoadingMoreStories, setIsLoadingMoreStories] = useState(false);
+
   const { data: related = [] } = useQuery({
     queryKey: ["related", article.id],
     queryFn: () => articleService.related(article),
   });
   const { data: trending = [] } = useQuery({
     queryKey: ["trending-article"],
-    queryFn: () => articleService.listTrending(9),
+    queryFn: () => articleService.listTrending(24),
     staleTime: 60_000,
   });
   const url = typeof window !== "undefined" ? window.location.href : `/article/${article.slug}`;
@@ -114,63 +163,34 @@ function ArticlePage() {
       poll();
     }
 
-    // Instagram: hydrate into direct video or photo with zero black letterbox or widget bloat
-    const inlineIgBlocks = root.querySelectorAll<HTMLElement>("blockquote.instagram-media");
-    if (inlineIgBlocks.length > 0) {
-      inlineIgBlocks.forEach((bq) => {
-        const permalink =
-          bq.getAttribute("data-instgrm-permalink") ||
-          bq.getAttribute("data-embed-permalink") ||
-          bq.querySelector("a")?.href;
-        if (!permalink) return;
+    // Instagram: hydrate official responsive embeds
+    const hasInstagram =
+      !!root.querySelector("blockquote.instagram-media") ||
+      !!document.querySelector("blockquote.instagram-media");
 
-        // Ensure blockquote has SDK-required attributes BEFORE we try either replacement
-        if (!bq.hasAttribute("data-instgrm-permalink")) bq.setAttribute("data-instgrm-permalink", permalink);
-        if (!bq.hasAttribute("data-instgrm-version")) bq.setAttribute("data-instgrm-version", "14");
-        if (!bq.hasAttribute("data-instgrm-captioned")) bq.setAttribute("data-instgrm-captioned", "");
-
-        // Replace child skeleton if present, but keep open tag intact for SDK fallback
-        const fallbackAnchor = bq.querySelector("a");
-        if (fallbackAnchor && !/background/i.test(bq.getAttribute("style") || "")) {
-          bq.setAttribute("style", (bq.getAttribute("style") || "") + "background:#FFFFFF;background-color:#FFFFFF;border:0;border-radius:12px;box-shadow:none;margin:1px auto;max-width:540px;min-width:326px;padding:0;width:calc(100% - 2px);color-scheme:light;");
+    if (hasInstagram) {
+      const pollIg = (attempts = 0) => {
+        const w = window as any;
+        if (w.instgrm?.Embeds?.process) {
+          try {
+            w.instgrm.Embeds.process();
+            return;
+          } catch {}
         }
+        if (attempts < 50) setTimeout(() => pollIg(attempts + 1), 80);
+      };
 
-        fetch(`/api/media/instagram?url=${encodeURIComponent(permalink)}`)
-          .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad status"))))
-          .then((res) => {
-            if (!res?.success) throw new Error("no media");
-            const container = bq.closest("figure") || bq;
-            if (res.type === "video" && res.videoUrl) {
-              container.innerHTML = `<div class="social-embed-media-wrapper w-fit max-w-[540px] mx-auto flex flex-col items-center justify-center bg-transparent rounded-xl overflow-hidden border border-gray-200 shadow-xs"><video src="${res.videoUrl}" poster="${res.imageUrl || ""}" controls playsinline preload="metadata" class="social-media-item w-full h-auto max-h-[85vh] object-cover rounded-xl mx-auto block"></video></div>`;
-            } else if (res.imageUrl) {
-              container.innerHTML = `<div class="social-embed-media-wrapper w-fit max-w-[540px] mx-auto flex flex-col items-center justify-center bg-transparent rounded-xl overflow-hidden border border-gray-200 shadow-xs"><img src="${res.imageUrl}" alt="Instagram media" class="social-media-item w-full h-auto max-h-[85vh] object-cover rounded-xl mx-auto block" /></div>`;
-            } else {
-              throw new Error("empty media urls");
-            }
-          })
-          .catch(() => {
-            // Direct media fallback failed — load Instagram's official embed SDK to hydrate the blockquote
-            const pollIg = (attempts = 0) => {
-              const w = window as any;
-              if (w.instgrm?.Embeds?.process) {
-                try {
-                  w.instgrm.Embeds.process();
-                  return;
-                } catch {}
-              }
-              if (attempts < 40) setTimeout(() => pollIg(attempts + 1), 80);
-            };
-            if (!document.querySelector('script[src="https://www.instagram.com/embed.js"]')) {
-              const s = document.createElement("script");
-              s.async = true;
-              s.defer = true;
-              s.src = "https://www.instagram.com/embed.js";
-              s.onerror = () => {};
-              document.body.appendChild(s);
-            }
-            pollIg();
-          });
-      });
+      if (!document.querySelector('script[src*="instagram.com/embed.js"]')) {
+        const s = document.createElement("script");
+        s.async = true;
+        s.defer = true;
+        s.src = "https://www.instagram.com/embed.js";
+        s.onload = () => pollIg();
+        s.onerror = () => {};
+        document.body.appendChild(s);
+      } else {
+        pollIg();
+      }
     }
 
     // TikTok
@@ -220,10 +240,45 @@ function ArticlePage() {
         if (!existing) document.body.appendChild(s);
       }
     }
+
+    // Auto-resize official Instagram iframes based on Instagram's MEASURE events
+    const handleIgMessage = (event: MessageEvent) => {
+      if (!event.origin || !event.origin.includes("instagram.com")) return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data && (data.type === "MEASURE" || data.type === "MOUNTED") && data.details?.height) {
+          const h = Number(data.details.height);
+          if (h && h > 100 && h < 1400) {
+            const iframes = root.querySelectorAll<HTMLIFrameElement>("iframe.instagram-official-iframe");
+            iframes.forEach((ifr) => {
+              if (ifr.contentWindow === event.source) {
+                ifr.style.height = `${h}px`;
+                const parentWrap = ifr.closest(".instagram-embed-frame-wrap") as HTMLElement | null;
+                if (parentWrap) parentWrap.style.height = `${h}px`;
+              }
+            });
+          }
+        }
+      } catch {}
+    };
+    window.addEventListener("message", handleIgMessage);
+    return () => {
+      window.removeEventListener("message", handleIgMessage);
+    };
   }, [articleBodyHtml]);
 
   const readNext = trending.slice(0, 3);
-  const nineGrid = trending.slice(0, 9);
+  const moreStoriesList = trending.filter((a) => a.id !== article.id);
+  const displayedMore = moreStoriesList.slice(0, moreStoriesCount);
+  const hasMoreStories = moreStoriesCount < moreStoriesList.length;
+
+  const handleShowMoreStories = () => {
+    setIsLoadingMoreStories(true);
+    setTimeout(() => {
+      setMoreStoriesCount((prev) => prev + 6);
+      setIsLoadingMoreStories(false);
+    }, 250);
+  };
 
   return (
     <>
@@ -274,16 +329,36 @@ function ArticlePage() {
             <ShareButtons url={url} title={article.title} />
           </div>
 
-          {nineGrid.length > 0 && (
+          {displayedMore.length > 0 && (
             <section className="mt-16">
               <div className="mb-6 border-b-2 border-black pb-2">
                 <h2 className="display text-2xl font-black uppercase">More Stories</h2>
               </div>
               <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                {nineGrid.map((a: any) => (
+                {displayedMore.map((a: any) => (
                   <ArticleCard key={a.id} article={a} />
                 ))}
               </div>
+
+              {hasMoreStories && (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleShowMoreStories}
+                    disabled={isLoadingMoreStories}
+                    className="w-full max-w-md py-3.5 px-8 border-2 border-black bg-white hover:bg-black text-black hover:text-white font-black uppercase text-sm tracking-widest transition-all duration-200 flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    {isLoadingMoreStories ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Loading Stories...</span>
+                      </>
+                    ) : (
+                      <span>Show More Stories</span>
+                    )}
+                  </button>
+                </div>
+              )}
             </section>
           )}
 
@@ -321,9 +396,9 @@ function ArticlePage() {
         </div>
 
         <div className="relative hidden lg:block">
-          <div className="sticky top-24">
+          <SmartStickySidebar>
             <TrendingSidebar />
-          </div>
+          </SmartStickySidebar>
         </div>
       </div>
     </>
@@ -355,7 +430,7 @@ function formatArticleBody(body: string) {
   // Normalize any inline font-size styles from rich text / WordPress so paragraph size stays uniform
   enriched = enriched.replace(/\bfont-size\s*:\s*[^;"]+;?/gi, "");
 
-  // Transform Instagram blockquotes into official responsive embeds
+  // Transform Instagram blockquotes into official responsive embeds (reels/videos get .ig-embed-fit)
   enriched = enriched.replace(
     /(?:<figure[^>]*>\s*)?<blockquote\b[^>]*class="[^"]*instagram-media[^"]*"[^>]*>[\s\S]*?<\/blockquote>(?:\s*<\/figure>)?/gi,
     (fullMatch) => {
@@ -365,11 +440,10 @@ function formatArticleBody(body: string) {
         fullMatch.match(/href="([^"]+instagram\.com\/[^"]+)"/i);
       if (!permalinkMatch) return fullMatch;
       const permalink = permalinkMatch[1].replace(/^`|`$/g, "").replace(/&amp;/g, "&").trim();
-      const cleanLink = permalink.replace(/\/+$/, "") + "/";
-      const isReel = /reels?/i.test(cleanLink);
-      const maxW = isReel ? "380px" : "540px";
-      const minH = isReel ? "620px" : "560px";
-      return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[${maxW}] mx-auto text-center bg-transparent" data-is-reel="${isReel ? "true" : "false"}"><blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:${maxW}; min-width:326px; min-height:${minH}; padding:0; width:calc(100% - 2px); color-scheme:light;"><div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600;">View this ${isReel ? "reel" : "post"} on Instagram</a></div></blockquote></figure>`;
+      const shortcode = extractInstagramShortcode(permalink);
+      if (!shortcode) return fullMatch;
+      const iframeSrc = `https://www.instagram.com/p/${shortcode}/embed/captioned/?cr=1&v=14`;
+      return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[540px] mx-auto text-center bg-transparent"><div class="instagram-embed-frame-wrap w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs" style="min-height:360px;"><iframe src="${iframeSrc}" title="Instagram post" class="instagram-official-iframe w-full block border-0 bg-white" style="min-height:360px; height:560px; width:100%; border:0;" scrolling="no" frameborder="0" allowtransparency="true" allowfullscreen="true" loading="lazy"></iframe></div></figure>`;
     },
   );
 
@@ -409,11 +483,11 @@ function formatArticleBody(body: string) {
     }
 
     if (/instagram\.com/i.test(src)) {
-      const cleanLink = src.replace(/\/embed\/.*$/i, "").replace(/\/+$/, "") + "/";
-      const isReel = /reels?/i.test(cleanLink);
-      const maxW = isReel ? "380px" : "540px";
-      const minH = isReel ? "620px" : "560px";
-      return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[${maxW}] mx-auto text-center bg-transparent" data-is-reel="${isReel ? "true" : "false"}"><blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:${maxW}; min-width:326px; min-height:${minH}; padding:0; width:calc(100% - 2px); color-scheme:light;"><div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600;">View this ${isReel ? "reel" : "post"} on Instagram</a></div></blockquote></figure>`;
+      const shortcode = extractInstagramShortcode(src);
+      if (shortcode) {
+        const iframeSrc = `https://www.instagram.com/p/${shortcode}/embed/captioned/?cr=1&v=14`;
+        return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[540px] mx-auto text-center bg-transparent"><div class="instagram-embed-frame-wrap w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs" style="min-height:360px;"><iframe src="${iframeSrc}" title="Instagram post" class="instagram-official-iframe w-full block border-0 bg-white" style="min-height:360px; height:560px; width:100%; border:0;" scrolling="no" frameborder="0" allowtransparency="true" allowfullscreen="true" loading="lazy"></iframe></div></figure>`;
+      }
     }
 
     if (/facebook\.com/i.test(src)) {
@@ -737,8 +811,9 @@ function normalizeSocialEmbedBlockquotes(html: string): string {
       // Ensure data-instgrm-permalink / cite attributes are clean (no backticks)
       // so the respective widget SDKs still hydrate on the frontend.
       if (bq.classList.contains("instagram-media") && safeLink) {
+        const canonical = normalizeInstagramUrl(safeLink);
         bq.setAttribute("data-instgrm-captioned", "");
-        bq.setAttribute("data-instgrm-permalink", safeLink);
+        bq.setAttribute("data-instgrm-permalink", canonical);
         if (!bq.hasAttribute("data-instgrm-version")) bq.setAttribute("data-instgrm-version", "14");
       }
       if (bq.classList.contains("tiktok-embed") && safeLink) {
@@ -764,265 +839,84 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;");
 }
 
-function InstagramMediaDirect({
-  permalink,
-  isReel,
-}: {
-  permalink: string;
-  isReel?: boolean;
-}) {
-  const [data, setData] = useState<{
-    type: "video" | "image";
-    videoUrl?: string | null;
-    imageUrl?: string | null;
-    rawVideoUrl?: string | null;
-    rawImageUrl?: string | null;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+function InstagramEmbed({ permalink }: { permalink: string }) {
+  const shortcode = extractInstagramShortcode(permalink);
+  const canonicalUrl = shortcode
+    ? `https://www.instagram.com/p/${shortcode}/`
+    : normalizeInstagramUrl(permalink);
+  const iframeSrc = shortcode
+    ? `https://www.instagram.com/p/${shortcode}/embed/captioned/?cr=1&v=14`
+    : `${canonicalUrl.replace(/\/+$/, "")}/embed/captioned/?cr=1&v=14`;
 
+  // Start with clean default height: 420px for landscape, 560px for square/standard
+  const [height, setHeight] = useState<number>(560);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // If server media metadata detects horizontal/landscape, tighten initial height to 420px
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setIsPlaying(false);
-    setImgError(false);
-    setFailed(false);
-    fetch(`/api/media/instagram?url=${encodeURIComponent(permalink)}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (!active) return;
-        if (res?.success && (res.videoUrl || res.imageUrl)) {
-          setData(res);
-        } else {
-          setFailed(true);
+    let cancelled = false;
+    fetch(`/api/media/instagram?url=${encodeURIComponent(canonicalUrl)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        if (data.isLandscape || (data.aspectRatio && data.aspectRatio > 1.2)) {
+          setHeight((prev) => (prev > 440 ? 420 : prev));
+        } else if (data.aspectRatio && data.aspectRatio < 0.8) {
+          setHeight((prev) => (prev < 680 ? 700 : prev));
         }
       })
-      .catch(() => {
-        if (active) setFailed(true);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      .catch(() => {});
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [permalink]);
+  }, [canonicalUrl]);
 
-  // When user clicks play, start video immediately
+  // Listen to Instagram's official MEASURE & MOUNTED postMessage events to snap to exact height
   useEffect(() => {
-    if (isPlaying && videoRef.current) {
-      videoRef.current.play().catch(() => {});
-    }
-  }, [isPlaying]);
-
-  // If direct fetch fails, trigger Instagram SDK process for official embed widget
-  useEffect(() => {
-    if (failed && typeof window !== "undefined") {
-      const poll = (attempts = 0) => {
-        const w = window as any;
-        if (w.instgrm?.Embeds?.process) {
-          try {
-            w.instgrm.Embeds.process();
-          } catch {}
-          return;
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.origin || !event.origin.includes("instagram.com")) return;
+      if (iframeRef.current && event.source !== iframeRef.current.contentWindow) return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data && (data.type === "MEASURE" || data.type === "MOUNTED") && data.details?.height) {
+          const h = Number(data.details.height);
+          if (h && h > 100 && h < 1400) {
+            setHeight(h);
+          }
         }
-        if (attempts < 30) setTimeout(() => poll(attempts + 1), 100);
-      };
-      if (!document.querySelector('script[src="https://www.instagram.com/embed.js"]')) {
-        const script = document.createElement("script");
-        script.async = true;
-        script.defer = true;
-        script.src = "https://www.instagram.com/embed.js";
-        document.body.appendChild(script);
-      }
-      poll();
-    }
-  }, [failed]);
+      } catch {}
+    };
 
-  const maxW = isReel ? "max-w-[380px]" : "max-w-[540px]";
-
-  if (loading) {
-    return (
-      <section className="my-6 w-full flex flex-col items-center justify-center">
-        <div
-          className={`w-full ${maxW} aspect-[9/16] bg-gray-50 border border-gray-100 rounded-xl flex flex-col items-center justify-center text-xs text-gray-400 animate-pulse mx-auto`}
-          style={{ maxHeight: "76vh" }}
-        >
-          <div className="w-10 h-10 rounded-full border-2 border-gray-300 border-t-black animate-spin mb-3" />
-          <span>Loading post...</span>
-        </div>
-      </section>
-    );
-  }
-
-  // Fallback: render official Instagram embed widget with original size and aspect ratio
-  if (failed || !data) {
-    const embedMaxW = isReel ? "380px" : "540px";
-    const embedMinH = isReel ? "620px" : "560px";
-    return (
-      <section className="my-6 w-full flex flex-col items-center justify-center" data-is-reel={isReel ? "true" : "false"}>
-        <blockquote
-          className="instagram-media mx-auto"
-          data-instgrm-captioned
-          data-instgrm-permalink={permalink}
-          data-instgrm-version="14"
-          style={{
-            background: "#FFFFFF",
-            backgroundColor: "#FFFFFF",
-            border: 0,
-            borderRadius: "12px",
-            boxShadow: "none",
-            margin: "1px auto",
-            maxWidth: embedMaxW,
-            minWidth: "326px",
-            minHeight: embedMinH,
-            padding: 0,
-            width: "calc(100% - 2px)",
-          }}
-        >
-          <div style={{ padding: "16px", background: "#FFFFFF", textAlign: "center" }}>
-            <a
-              href={permalink}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#000000", textDecoration: "none", fontWeight: 600 }}
-            >
-              View this {isReel ? "Reel" : "Post"} on Instagram
-            </a>
-          </div>
-        </blockquote>
-      </section>
-    );
-  }
-
-  // Determine thumbnail image URL: first try proxied imageUrl, fallback to rawImageUrl
-  const thumbUrl = imgError
-    ? data?.rawImageUrl || data?.imageUrl
-    : data?.imageUrl || data?.rawImageUrl;
-
-  if (data?.type === "video" && (data.videoUrl || data.rawVideoUrl)) {
-    const videoSrc = data.videoUrl || data.rawVideoUrl || "";
-    return (
-      <section className="my-6 w-full flex flex-col items-center justify-center">
-        <div
-          className={`social-embed-media-wrapper w-fit ${maxW} mx-auto flex flex-col items-center justify-center bg-transparent rounded-xl overflow-hidden border border-gray-200 shadow-sm relative group`}
-        >
-          {!isPlaying ? (
-            <div
-              className="relative w-full cursor-pointer flex flex-col items-center justify-center bg-transparent overflow-hidden select-none"
-              onClick={() => setIsPlaying(true)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setIsPlaying(true);
-                }
-              }}
-              aria-label="Play video"
-            >
-              {thumbUrl ? (
-                <img
-                  src={thumbUrl}
-                  alt="Post thumbnail"
-                  onError={() => {
-                    if (!imgError && data.rawImageUrl && data.rawImageUrl !== thumbUrl) {
-                      setImgError(true);
-                    }
-                  }}
-                  className="social-media-item w-full h-auto max-h-[85vh] object-cover rounded-xl mx-auto block"
-                />
-              ) : (
-                <div className="w-full aspect-[9/16] max-h-[85vh] bg-neutral-100 flex items-center justify-center" />
-              )}
-
-              {/* Centered Play Button Overlay */}
-              <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-all rounded-xl">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/95 text-black flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-200">
-                  <Play className="w-7 h-7 sm:w-9 sm:h-9 fill-black text-black ml-1" />
-                </div>
-              </div>
-
-              {/* Discreet badge showing type */}
-              <div className="absolute top-3 right-3 px-2.5 py-1 bg-black/70 backdrop-blur-xs text-white text-[11px] font-bold rounded-full uppercase tracking-wider">
-                {isReel ? "Reel" : "Video"}
-              </div>
-            </div>
-          ) : (
-            <video
-              ref={videoRef}
-              src={videoSrc}
-              poster={thumbUrl || undefined}
-              controls
-              autoPlay
-              playsInline
-              preload="auto"
-              className="social-media-item w-full h-auto max-h-[85vh] object-cover rounded-xl mx-auto block"
-              onEnded={() => setIsPlaying(false)}
-              onError={() => setFailed(true)}
-            />
-          )}
-        </div>
-      </section>
-    );
-  }
-
-  if (data?.imageUrl || data?.rawImageUrl) {
-    return (
-      <section className="my-6 w-full flex flex-col items-center justify-center">
-        <div
-          className={`social-embed-media-wrapper w-fit ${maxW} mx-auto flex flex-col items-center justify-center bg-transparent rounded-xl overflow-hidden border border-gray-200 shadow-sm`}
-        >
-          <img
-            src={thumbUrl || ""}
-            alt="Instagram media"
-            onError={() => {
-              if (!imgError && data.rawImageUrl && data.rawImageUrl !== thumbUrl) {
-                setImgError(true);
-              }
-            }}
-            className="social-media-item w-full h-auto max-h-[85vh] object-cover rounded-xl mx-auto block"
-          />
-        </div>
-      </section>
-    );
-  }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   return (
-    <section className="my-6 w-full flex flex-col items-center justify-center">
-      <blockquote
-        className="instagram-media mx-auto"
-        data-instgrm-captioned
-        data-instgrm-permalink={permalink}
-        data-instgrm-version="14"
-        style={{
-          background: "#FFFFFF",
-          backgroundColor: "#FFFFFF",
-          border: 0,
-          borderRadius: "12px",
-          boxShadow: "none",
-          margin: "1px auto",
-          maxWidth: "540px",
-          minWidth: "326px",
-          padding: 0,
-          width: "calc(100% - 2px)",
-        }}
+    <figure className="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[540px] mx-auto text-center bg-transparent">
+      <div
+        className="instagram-embed-frame-wrap w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-[height] duration-200"
+        style={{ minHeight: "360px", height: `${height}px` }}
       >
-        <div style={{ padding: "16px", background: "#FFFFFF", textAlign: "center" }}>
-          <a
-            href={permalink}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "#000000", textDecoration: "none", fontWeight: 600 }}
-          >
-            View this {isReel ? "Reel" : "Post"} on Instagram
-          </a>
-        </div>
-      </blockquote>
-    </section>
+        <iframe
+          ref={iframeRef}
+          src={iframeSrc}
+          title="Instagram post"
+          className="instagram-official-iframe w-full block border-0 bg-white"
+          style={{
+            height: `${height}px`,
+            width: "100%",
+            border: 0,
+            overflow: "hidden",
+            display: "block",
+          }}
+          scrolling="no"
+          frameBorder="0"
+          allowTransparency={true}
+          allowFullScreen={true}
+          loading="lazy"
+        />
+      </div>
+    </figure>
   );
 }
 
@@ -1032,33 +926,6 @@ function EmbeddedPost({ url }: { url: string }) {
   useEffect(() => {
     if (!embed || typeof document === "undefined") return;
     let cancelled = false;
-
-    if (embed.type === "instagram") {
-      const poll = (attempts = 0) => {
-        if (cancelled) return;
-        const w = window as any;
-        if (w.instgrm?.Embeds?.process) {
-          try {
-            w.instgrm.Embeds.process();
-          } catch {}
-          return;
-        }
-        if (attempts < 40) {
-          setTimeout(() => poll(attempts + 1), 80);
-        }
-      };
-
-      if (!document.querySelector('script[src="https://www.instagram.com/embed.js"]')) {
-        const script = document.createElement("script");
-        script.async = true;
-        script.defer = true;
-        script.src = "https://www.instagram.com/embed.js";
-        script.onerror = () => {};
-        document.body.appendChild(script);
-      }
-      poll();
-      return;
-    }
 
     if (embed.type === "twitter") {
       const poll = (attempts = 0) => {
@@ -1123,8 +990,7 @@ function EmbeddedPost({ url }: { url: string }) {
   }
 
   if (embed.type === "instagram") {
-    const isReel = (embed as any).isReel || /reels?/i.test(embed.permalink);
-    return <InstagramMediaDirect permalink={embed.permalink} isReel={isReel} />;
+    return <InstagramEmbed permalink={embed.permalink} />;
   }
 
   if (embed.type === "twitter") {
@@ -1418,7 +1284,9 @@ function getEmbedConfig(url: string) {
 
     if (host === "instagram.com" || host === "m.instagram.com" || host === "instagr.am") {
       const pathOnly = parsed.pathname.replace(/\/+$/, "") + "/";
-      const isReel = /^\/reels?\//i.test(pathOnly);
+      const reelMatch = pathOnly.match(/^\/reels?\/([A-Za-z0-9_-]+)/i);
+      const shortcode = reelMatch ? reelMatch[1] : null;
+      const canonicalPath = shortcode ? `/p/${shortcode}/` : pathOnly;
       if (
         pathOnly.startsWith("/p/") ||
         pathOnly.startsWith("/reel/") ||
@@ -1428,8 +1296,7 @@ function getEmbedConfig(url: string) {
       ) {
         return {
           type: "instagram" as const,
-          permalink: `https://www.instagram.com${pathOnly}`,
-          isReel,
+          permalink: `https://www.instagram.com${canonicalPath}`,
         };
       }
       return {

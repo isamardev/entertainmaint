@@ -127,26 +127,25 @@
 }
 
 /* Trending Now horizontal manual scrollbar — ALWAYS visible so users can drag
-   left / right (WebKit / Chromium / Safari + Firefox fallbacks). Track matches
-   bar background, thumb uses the site yellow accent for visibility. */
+/* Trending Now horizontal manual scrollbar — Gray accent matching editorial styling */
 .trending-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-yellow) oklch(0.97 0.005 260);
+  scrollbar-color: #9ca3af #f3f4f6;
 }
 .trending-scroll::-webkit-scrollbar {
-  height: 8px;
+  height: 6px;
 }
 .trending-scroll::-webkit-scrollbar-track {
-  background: oklch(0.97 0.005 260);
+  background: #f3f4f6;
   border-radius: 9999px;
 }
 .trending-scroll::-webkit-scrollbar-thumb {
-  background: var(--color-yellow);
+  background: #9ca3af;
   border-radius: 9999px;
-  border: 1px solid oklch(0.92 0.005 260);
+  border: 1px solid #e5e7eb;
 }
 .trending-scroll::-webkit-scrollbar-thumb:hover {
-  filter: brightness(1.05);
+  background: #6b7280;
 }
 
 @utility ticker-track {
@@ -464,6 +463,8 @@ blockquote.instagram-media {
   margin-right: auto !important;
   max-width: 540px !important;
   min-width: min(100%, 326px) !important;
+  min-height: 0 !important;
+  height: auto !important;
   width: 100% !important;
   display: block !important;
   background-color: #ffffff !important;
@@ -473,16 +474,46 @@ blockquote.instagram-media {
   border-radius: 12px !important;
 }
 
-/* Instagram rendered iframe: Never override height with height:auto! Allow Instagram embed.js to set dynamic height. Min-height ensures video & controls are fully visible */
+
+/* Instagram rendered iframe: Allow Instagram embed.js to set dynamic height. Natural aspect ratio & responsive width */
+.instagram-embed-frame-wrap {
+  width: 100%;
+  max-width: 540px;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #ffffff;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+iframe.instagram-official-iframe {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  max-width: 540px !important;
+  width: 100% !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  display: block !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color-scheme: light !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
 iframe.instagram-media,
 iframe.instagram-media-rendered,
-iframe[src*="instagram.com"] {
+iframe[src*="instagram.com"]:not(.instagram-official-iframe) {
   margin-left: auto !important;
   margin-right: auto !important;
   max-width: 540px !important;
   min-width: min(100%, 326px) !important;
   width: 100% !important;
-  min-height: 560px !important;
+  min-height: 0 !important;
+  max-height: none !important;
   display: block !important;
   background-color: #ffffff !important;
   background: #ffffff !important;
@@ -490,17 +521,6 @@ iframe[src*="instagram.com"] {
   box-sizing: border-box !important;
   border-radius: 12px !important;
   border: 1px solid #e5e7eb !important;
-}
-
-/* Instagram Reel: 380px max-width fits vertical 9:16 reels edge-to-edge without side black gaps */
-blockquote.instagram-media[data-instgrm-permalink*="/reel/"],
-blockquote.instagram-media[data-instgrm-permalink*="/reels/"],
-iframe[src*="/reel/"],
-iframe[src*="/reels/"],
-figure[data-is-reel="true"] blockquote.instagram-media,
-figure[data-is-reel="true"] iframe.instagram-media {
-  max-width: 380px !important;
-  min-height: 620px !important;
 }
 
 /* TikTok centering */

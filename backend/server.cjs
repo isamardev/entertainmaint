@@ -995,6 +995,7 @@ const SETTINGS_KEY_SOCIALS = "social_links";
 const SETTINGS_KEY_META = "site_meta";
 const SETTINGS_KEY_PRIVACY = "privacy_policy";
 const SETTINGS_KEY_CONTACT = "contact_page";
+const SETTINGS_KEY_MESSAGES = "contact_inquiries";
 const SettingsModel = db.SiteSetting || require("./models/SiteSetting.cjs");
 
 const DEFAULT_CONTACT_SETTINGS = {
@@ -1322,19 +1323,95 @@ app.post("/api/admin/contact", requireAdmin, async (req, res) => {
   }
 });
 
-// Public Contact Message submission endpoint
+// Public Contact Message submission endpoint - persists messages for admin
 app.post("/api/contact/message", async (req, res) => {
   try {
     const { name, email, subject, message } = req.body || {};
     if (!name || !email || !message) {
       return res.status(400).json({ error: "Name, email, and message are required." });
     }
-    // Log inquiry safely for admin record
-    console.log(`[contact-inquiry] From: ${name} <${email}> | Subject: ${subject || "No Subject"}`);
+    const cleanName = String(name).trim();
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanSubject = String(subject || "General Inquiry").trim();
+    const cleanMessage = String(message).trim();
+
+    const newMessage = {
+      id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+      name: cleanName,
+      email: cleanEmail,
+      subject: cleanSubject,
+      message: cleanMessage,
+      created_at: new Date().toISOString(),
+      is_read: false,
+    };
+
+    const existingMessages = (await readSettingsJSON(SETTINGS_KEY_MESSAGES, [])) || [];
+    const updatedMessages = [newMessage, ...existingMessages].slice(0, 500);
+    await writeSettingsJSON(SETTINGS_KEY_MESSAGES, updatedMessages);
+
+    console.log(`[contact-inquiry] Saved message from: ${cleanName} <${cleanEmail}>`);
     res.json({
       ok: true,
       message: "Thank you for reaching out! Your message has been received.",
+      id: newMessage.id,
     });
+  } catch (error) {
+    console.error("Error saving contact message:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Get all received contact messages
+app.get("/api/admin/contact/messages", requireAdmin, async (req, res) => {
+  try {
+    const messages = (await readSettingsJSON(SETTINGS_KEY_MESSAGES, [])) || [];
+    res.json({
+      ok: true,
+      data: messages,
+      total: messages.length,
+      unread: messages.filter((m) => !m.is_read).length,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Mark message as read/unread
+app.patch("/api/admin/contact/messages/:id/read", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_read = true } = req.body || {};
+    const messages = (await readSettingsJSON(SETTINGS_KEY_MESSAGES, [])) || [];
+    const updated = messages.map((m) =>
+      m.id === id ? { ...m, is_read: Boolean(is_read) } : m,
+    );
+    await writeSettingsJSON(SETTINGS_KEY_MESSAGES, updated);
+    res.json({ ok: true, message: "Status updated successfully." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Delete a single contact message
+app.delete("/api/admin/contact/messages/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const messages = (await readSettingsJSON(SETTINGS_KEY_MESSAGES, [])) || [];
+    const filtered = messages.filter((m) => m.id !== id);
+    await writeSettingsJSON(SETTINGS_KEY_MESSAGES, filtered);
+    res.json({ ok: true, message: "Message deleted successfully." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Clear all read messages
+app.post("/api/admin/contact/messages/clear-read", requireAdmin, async (req, res) => {
+  try {
+    const messages = (await readSettingsJSON(SETTINGS_KEY_MESSAGES, [])) || [];
+    const unreadOnly = messages.filter((m) => !m.is_read);
+    await writeSettingsJSON(SETTINGS_KEY_MESSAGES, unreadOnly);
+    res.json({ ok: true, message: "Read messages cleared successfully." });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

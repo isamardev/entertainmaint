@@ -1,91 +1,104 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { articleService } from "@/services/articleService";
+import { articleService, type Article } from "@/services/articleService";
 
 export function TrendingBar() {
-  const { data = [] } = useQuery({
-    queryKey: ["trending-bar"],
-    queryFn: () => articleService.listTrending(24),
+  // Fetch latest published articles
+  const { data } = useQuery({
+    queryKey: ["trending-bar-latest"],
+    queryFn: () => articleService.listPublished({ limit: 20 }),
     staleTime: 60_000,
   });
 
-  const rows = React.useMemo(() => {
+  // Exactly 8 latest articles, sorted by newest first
+  const rows: Article[] = React.useMemo(() => {
+    const list = data?.data ?? [];
     const seen = new Set<string>();
-    return (data || []).filter((a: any) => {
-      const slug = String(a.slug || a.id || Math.random())
-        .toLowerCase()
-        .trim();
-      if (seen.has(slug)) return false;
-      seen.add(slug);
-      return true;
-    });
+    return list
+      .slice()
+      .sort((a, b) => {
+        const timeA = new Date(a.published_at || a.created_at || 0).getTime();
+        const timeB = new Date(b.published_at || b.created_at || 0).getTime();
+        return timeB - timeA;
+      })
+      .filter((a) => {
+        const slug = String(a.slug || a.id || Math.random())
+          .toLowerCase()
+          .trim();
+        if (seen.has(slug)) return false;
+        seen.add(slug);
+        return true;
+      })
+      .slice(0, 8);
   }, [data]);
 
   if (!rows.length) return null;
 
   return (
     <div className="w-full border-b border-gray-300 bg-white">
-      <div className="w-full px-3 sm:px-4 md:px-6 !py-0">
-        {/* Bar compressed: outer py-2 instead of py-3 (chhota height). */}
-        <div className="flex flex-col items-stretch gap-2 py-2 sm:flex-row sm:items-center sm:gap-3">
-          <div className="flex shrink-0 items-center gap-3 sm:w-auto">
-            <span className="display shrink-0 pl-0 pr-2 text-[11px] font-black uppercase tracking-[0.25em] text-black">
-              Trending Now
-            </span>
-          </div>
+      <div className="w-full px-1.5 sm:px-2 md:px-3">
+        {/* Top header: "TRENDING NOW" with horizontal rule extending across */}
+        <div className="flex items-center gap-2 pt-2 pb-1.5">
+          <span className="shrink-0 text-[9.5px] font-medium uppercase tracking-[0.18em] text-neutral-800">
+            Trending Now
+          </span>
+          <div className="h-[1px] flex-1 bg-gray-300" />
+        </div>
+
+        {/* Story items carousel: Image on left, title on right, 8 latest articles */}
+        <div
+          className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pt-1 pb-2.5 trending-scroll"
+          style={{
+            scrollbarGutter: "stable both-edges",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
           <div
-            className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 trending-scroll"
-            style={{
-              scrollbarGutter: "stable both-edges",
-              WebkitOverflowScrolling: "touch",
-            }}
+            className="flex flex-nowrap items-center pr-3"
+            style={{ minWidth: "max-content" }}
           >
-            {/* Single 1 row, flex-nowrap = NO multi row wrap ever. */}
-            <div
-              className="flex flex-nowrap items-center gap-x-5 gap-y-0 pr-3"
-              style={{ minWidth: "max-content" }}
-            >
-              {rows.map((a: any) => {
-                const img = a.hero_image_hd ?? a.hero_image_lq;
-                return (
-                  <Link
-                    key={a.id}
-                    to="/article/$slug"
-                    params={{ slug: a.slug || "#" }}
-                    className="group flex shrink-0 items-center gap-2.5"
-                    style={{ width: "210px", height: "40px" }}
+            {rows.map((a: Article, idx: number) => {
+              const img = a.hero_image_hd ?? a.hero_image_lq;
+              return (
+                <Link
+                  key={a.id}
+                  to="/article/$slug"
+                  params={{ slug: a.slug || "#" }}
+                  className={`group flex shrink-0 items-center gap-2.5 pr-4 transition-opacity hover:opacity-80 ${
+                    idx < rows.length - 1 ? "border-r border-gray-300 mr-4" : ""
+                  }`}
+                  style={{ width: "278px", height: "62px" }}
+                >
+                  {img && (
+                    <div className="h-[58px] w-[82px] shrink-0 overflow-hidden bg-gray-100">
+                      <img
+                        src={img}
+                        alt={a.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+                  )}
+                  {/* Title 3 lines max in extra bold text */}
+                  <span
+                    className="font-sans inline-block flex-1 text-[13.5px] font-black leading-[1.2] tracking-tight text-black group-hover:text-black line-clamp-3"
+                    style={{
+                      fontWeight: 900,
+                      wordBreak: "break-word",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: "vertical",
+                    }}
                   >
-                    {img && (
-                      <div className="h-9 w-12 shrink-0 overflow-hidden bg-gray-100 border border-gray-100">
-                        <img
-                          src={img}
-                          alt={a.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    )}
-                    {/* Title 2 lines max with 3 dots (ellipsis) */}
-                    <span
-                      className="display inline-block flex-1 text-[11px] font-semibold leading-[1.3] text-black group-hover:text-black line-clamp-2"
-                      style={{
-                        width: img ? "calc(210px - 48px - 10px)" : "100%",
-                        wordBreak: "break-word",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                      }}
-                    >
-                      {a.title}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
+                    {a.title}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>

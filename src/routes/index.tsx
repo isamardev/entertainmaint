@@ -1,11 +1,9 @@
-import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { Loader2 } from "lucide-react";
 import { articleService, type Article } from "@/services/articleService";
 import { ArticleCard, ArticleMedia } from "@/components/site/ArticleCard";
-import { TrendingSidebar } from "@/components/site/Sidebar";
+import { TrendingSidebar, SmartStickySidebar } from "@/components/site/Sidebar";
 import { GridSkeleton } from "@/components/site/Skeleton";
 
 function articleImage(article: Article, alt = false) {
@@ -35,24 +33,12 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const [visibleCount, setVisibleCount] = useState(18);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-
   const { data, isLoading } = useQuery({
     queryKey: ["home-articles"],
-    queryFn: () => articleService.listPublished({ limit: 100 }),
+    queryFn: () => articleService.listPublished({ limit: 40 }),
   });
   const allArticles = data?.data ?? [];
-  const articles = allArticles.slice(0, visibleCount);
-  const hasMore = visibleCount < allArticles.length;
-
-  const handleShowMore = () => {
-    setIsLoadingMore(true);
-    setTimeout(() => {
-      setVisibleCount((prev) => prev + 12);
-      setIsLoadingMore(false);
-    }, 200);
-  };
+  const articles = allArticles.slice(0, 32);
   const mobileSections: Array<{ featured?: Article; list: Article[] }> = [];
 
   let mobileIndex = 0;
@@ -242,36 +228,15 @@ function Home() {
             )}
           </div>
 
-          {/* Show More Button */}
-          {!isLoading && hasMore && (
-            <div className="my-10 flex justify-center">
-              <button
-                type="button"
-                onClick={handleShowMore}
-                disabled={isLoadingMore}
-                className="w-full max-w-md py-3.5 px-8 border-2 border-black bg-white hover:bg-black text-black hover:text-white font-black uppercase text-sm tracking-widest transition-all duration-200 flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
-              >
-                {isLoadingMore ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Loading Stories...</span>
-                  </>
-                ) : (
-                  <span>Show More Stories</span>
-                )}
-              </button>
-            </div>
-          )}
-
           <div className="mt-10 lg:hidden">
             <TrendingSidebar />
           </div>
         </div>
 
         <div className="relative hidden lg:block">
-          <div className="sticky top-24">
+          <SmartStickySidebar>
             <TrendingSidebar />
-          </div>
+          </SmartStickySidebar>
         </div>
       </div>
     </>

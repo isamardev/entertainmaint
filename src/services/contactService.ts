@@ -270,9 +270,39 @@ export type ContactMessageData = {
   message: string;
 };
 
+export type ReceivedContactMessage = {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  created_at: string;
+  is_read: boolean;
+};
+
 export async function submitContactMessage(
   data: ContactMessageData,
 ): Promise<{ ok: boolean; message: string }> {
+  // Always record locally as immediate backup
+  try {
+    if (typeof window !== "undefined") {
+      const local = JSON.parse(localStorage.getItem("et_contact_messages_backup") || "[]");
+      const item: ReceivedContactMessage = {
+        id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        name: data.name.trim(),
+        email: data.email.trim(),
+        subject: (data.subject || "General Inquiry").trim(),
+        message: data.message.trim(),
+        created_at: new Date().toISOString(),
+        is_read: false,
+      };
+      localStorage.setItem(
+        "et_contact_messages_backup",
+        JSON.stringify([item, ...local].slice(0, 100)),
+      );
+    }
+  } catch {}
+
   try {
     const res = await fetch(getApiUrl("/contact/message"), {
       method: "POST",
@@ -289,9 +319,147 @@ export async function submitContactMessage(
     }
   } catch {}
 
-  // Fallback graceful success message if remote endpoint not answering
   return {
     ok: true,
     message: "Thank you! Your message has been sent successfully.",
   };
+}
+
+export async function getContactMessages(): Promise<{
+  ok: boolean;
+  data: ReceivedContactMessage[];
+  total: number;
+  unread: number;
+}> {
+  try {
+    const res = await adminApiRequest(getApiUrl("/admin/contact/messages"), {
+      method: "GET",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && Array.isArray(json.data)) {
+        return {
+          ok: true,
+          data: json.data,
+          total: json.total ?? json.data.length,
+          unread: json.unread ?? json.data.filter((m: any) => !m.is_read).length,
+        };
+      }
+    }
+  } catch {}
+
+  // Fallback to local storage backup
+  try {
+    if (typeof window !== "undefined") {
+      const local: ReceivedContactMessage[] = JSON.parse(
+        localStorage.getItem("et_contact_messages_backup") || "[]",
+      );
+      return {
+        ok: true,
+        data: local,
+        total: local.length,
+        unread: local.filter((m) => !m.is_read).length,
+      };
+    }
+  } catch {}
+
+  return { ok: true, data: [], total: 0, unread: 0 };
+}
+
+export async function markContactMessageRead(
+  id: string,
+  isRead: boolean = true,
+): Promise<boolean> {
+  try {
+    const res = await adminApiRequest(getApiUrl(`/admin/contact/messages/${id}/read`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_read: isRead }),
+    });
+    if (res.ok) {
+      // Sync local backup
+      try {
+        const local: ReceivedContactMessage[] = JSON.parse(
+          localStorage.getItem("et_contact_messages_backup") || "[]",
+        );
+        const updated = local.map((m) => (m.id === id ? { ...m, is_read: isRead } : m));
+        localStorage.setItem("et_contact_messages_backup", JSON.stringify(updated));
+      } catch {}
+      return true;
+    }
+  } catch {}
+
+  // Local storage update fallback
+  try {
+    if (typeof window !== "undefined") {
+      const local: ReceivedContactMessage[] = JSON.parse(
+        localStorage.getItem("et_contact_messages_backup") || "[]",
+      );
+      const updated = local.map((m) => (m.id === id ? { ...m, is_read: isRead } : m));
+      localStorage.setItem("et_contact_messages_backup", JSON.stringify(updated));
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+export async function deleteContactMessage(id: string): Promise<boolean> {
+  try {
+    const res = await adminApiRequest(getApiUrl(`/admin/contact/messages/${id}`), {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      try {
+        const local: ReceivedContactMessage[] = JSON.parse(
+          localStorage.getItem("et_contact_messages_backup") || "[]",
+        );
+        const filtered = local.filter((m) => m.id !== id);
+        localStorage.setItem("et_contact_messages_backup", JSON.stringify(filtered));
+      } catch {}
+      return true;
+    }
+  } catch {}
+
+  // Local storage deletion fallback
+  try {
+    if (typeof window !== "undefined") {
+      const local: ReceivedContactMessage[] = JSON.parse(
+        localStorage.getItem("et_contact_messages_backup") || "[]",
+      );
+      const filtered = local.filter((m) => m.id !== id);
+      localStorage.setItem("et_contact_messages_backup", JSON.stringify(filtered));
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+export async function clearReadContactMessages(): Promise<boolean> {
+  try {
+    const res = await adminApiRequest(getApiUrl("/admin/contact/messages/clear-read"), {
+      method: "POST",
+    });
+    if (res.ok) {
+      try {
+        const local: ReceivedContactMessage[] = JSON.parse(
+          localStorage.getItem("et_contact_messages_backup") || "[]",
+        );
+        const unreadOnly = local.filter((m) => !m.is_read);
+        localStorage.setItem("et_contact_messages_backup", JSON.stringify(unreadOnly));
+      } catch {}
+      return true;
+    }
+  } catch {}
+
+  try {
+    if (typeof window !== "undefined") {
+      const local: ReceivedContactMessage[] = JSON.parse(
+        localStorage.getItem("et_contact_messages_backup") || "[]",
+      );
+      const unreadOnly = local.filter((m) => !m.is_read);
+      localStorage.setItem("et_contact_messages_backup", JSON.stringify(unreadOnly));
+      return true;
+    }
+  } catch {}
+  return false;
 }

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { articleService, categoryService, type Article } from "@/services/articleService";
-import { TrendingSidebar } from "@/components/site/Sidebar";
+import { TrendingSidebar, SmartStickySidebar } from "@/components/site/Sidebar";
 import { shortDate } from "@/lib/format";
 
 export const Route = createFileRoute("/category/$slug")({
@@ -182,6 +184,9 @@ function SplitGroup({ index, three }: { index: number; three: Article[] }) {
 
 function CategoryPage() {
   const { category } = Route.useLoaderData();
+  const [visibleCount, setVisibleCount] = useState(12);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   // Load ALL category articles (limit bumped generous so infinite split works)
   const { data, isLoading } = useQuery({
     queryKey: ["category-page-full", category.slug],
@@ -190,15 +195,25 @@ function CategoryPage() {
     staleTime: 60_000,
   });
   const all = data?.data ?? [];
+  const displayedArticles = all.slice(0, visibleCount);
+  const hasMore = visibleCount < all.length;
+
+  const handleShowMore = () => {
+    setIsLoadingMore(true);
+    setTimeout(() => {
+      setVisibleCount((prev) => prev + 9);
+      setIsLoadingMore(false);
+    }, 250);
+  };
 
   // Every 3 articles → alternating large/2small split group
   const fullGroups: Article[][] = [];
   let i = 0;
-  while (i + 2 < all.length) {
-    fullGroups.push([all[i], all[i + 1], all[i + 2]]);
+  while (i + 2 < displayedArticles.length) {
+    fullGroups.push([displayedArticles[i], displayedArticles[i + 1], displayedArticles[i + 2]]);
     i += 3;
   }
-  const latest = all.slice(i);
+  const latest = displayedArticles.slice(i);
 
   return (
     <>
@@ -255,12 +270,33 @@ function CategoryPage() {
                 </div>
               </section>
             ) : null}
+
+            {/* Show More Button */}
+            {!isLoading && hasMore && (
+              <div className="my-10 flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleShowMore}
+                  disabled={isLoadingMore}
+                  className="w-full max-w-md py-3.5 px-8 border-2 border-black bg-white hover:bg-black text-black hover:text-white font-black uppercase text-sm tracking-widest transition-all duration-200 flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Loading Stories...</span>
+                    </>
+                  ) : (
+                    <span>Show More Stories</span>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="hidden lg:block">
-            <div className="sticky top-24">
+          <div className="relative hidden lg:block">
+            <SmartStickySidebar>
               <TrendingSidebar />
-            </div>
+            </SmartStickySidebar>
           </div>
         </div>
       )}

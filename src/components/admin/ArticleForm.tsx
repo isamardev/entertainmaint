@@ -355,6 +355,10 @@ export function ArticleForm({ initial, onSaved, uploadingState }: Props) {
                   val = match[1].replace(/^`|`$/g, "").replace(/&amp;/g, "&").trim();
                 }
               }
+              const reelMatch = val.match(/instagram\.com\/reels?\/([A-Za-z0-9_-]+)/i);
+              if (reelMatch && reelMatch[1]) {
+                val = `https://www.instagram.com/p/${reelMatch[1]}/`;
+              }
               set("embed_url", val);
             }}
             placeholder="Instagram, Facebook, X / Twitter, YouTube, TikTok, Threads post or video link"
@@ -1433,15 +1437,16 @@ function RichTextEditor({
     if (host === "instagram.com" || host === "m.instagram.com" || host === "instagr.am") {
       const pathOnly = parsed.pathname.replace(/\/+$/, "") + "/";
       const isReel = pathOnly.startsWith("/reel/") || pathOnly.startsWith("/reels/");
-      const cleanLink = `https://www.instagram.com${pathOnly}`;
-      const maxW = isReel ? "380px" : "540px";
-      const minH = isReel ? "620px" : "560px";
+      const reelMatch = pathOnly.match(/^\/reels?\/([A-Za-z0-9_-]+)/i);
+      const shortcode = reelMatch ? reelMatch[1] : null;
+      const canonicalPath = shortcode ? `/p/${shortcode}/` : pathOnly;
+      const cleanLink = `https://www.instagram.com${canonicalPath}`;
       return {
         platform: isReel ? "Instagram Reel" : "Instagram Post",
         html:
-          `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[${maxW}] mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1" data-is-reel="${isReel ? "true" : "false"}">` +
-          `<blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:0; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:${maxW}; min-width:326px; min-height:${minH}; padding:0; width:calc(100% - 2px); color-scheme:light;">` +
-          `<div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600;">View this ${isReel ? "reel" : "post"} on Instagram</a></div>` +
+          `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[540px] mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+          `<blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:1px solid #e5e7eb; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:540px; min-width:326px; min-height:0; padding:0; width:calc(100% - 2px); color-scheme:light;">` +
+          `<div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:14px;">View this post on Instagram</a></div>` +
           `</blockquote></figure><p><br></p>`,
       };
     }

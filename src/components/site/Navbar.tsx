@@ -42,8 +42,11 @@ export function Navbar() {
               key={c.id}
               to="/category/$slug"
               params={{ slug: c.slug }}
-              className="display px-3 py-2 text-sm font-bold uppercase tracking-wider text-foreground/80 transition-colors hover:text-black"
-              activeProps={{ className: "text-black" }}
+              className="display px-3 py-2 text-sm font-bold uppercase tracking-wider text-neutral-600 transition-colors hover:text-black"
+              activeProps={{
+                className:
+                  "!text-black font-black underline underline-offset-[7px] decoration-[1.5px] decoration-neutral-400",
+              }}
             >
               {c.name}
             </Link>
@@ -51,15 +54,21 @@ export function Navbar() {
           <div className="mx-2 h-5 w-px bg-border/70" aria-hidden="true" />
           <Link
             to="/contact"
-            className="display px-3 py-2 text-sm font-bold uppercase tracking-wider text-foreground/80 transition-colors hover:text-black"
-            activeProps={{ className: "text-black" }}
+            className="display px-3 py-2 text-sm font-bold uppercase tracking-wider text-neutral-600 transition-colors hover:text-black"
+            activeProps={{
+              className:
+                "!text-black font-black underline underline-offset-[7px] decoration-[1.5px] decoration-neutral-400",
+            }}
           >
             Contact Us
           </Link>
           <Link
             to="/privacy-policy"
-            className="display px-3 py-2 text-sm font-bold uppercase tracking-wider text-foreground/80 transition-colors hover:text-black"
-            activeProps={{ className: "text-black" }}
+            className="display px-3 py-2 text-sm font-bold uppercase tracking-wider text-neutral-600 transition-colors hover:text-black"
+            activeProps={{
+              className:
+                "!text-black font-black underline underline-offset-[7px] decoration-[1.5px] decoration-neutral-400",
+            }}
           >
             Privacy Policy
           </Link>
@@ -103,7 +112,11 @@ export function Navbar() {
                 to="/category/$slug"
                 params={{ slug: c.slug }}
                 onClick={() => setOpen(false)}
-                className="display border-b border-border py-2 text-sm font-bold uppercase tracking-wider"
+                className="display border-b border-border py-2 text-sm font-bold uppercase tracking-wider text-neutral-600"
+                activeProps={{
+                  className:
+                    "!text-black font-black underline underline-offset-[6px] decoration-[1.5px] decoration-neutral-400",
+                }}
               >
                 {c.name}
               </Link>
@@ -111,14 +124,22 @@ export function Navbar() {
             <Link
               to="/contact"
               onClick={() => setOpen(false)}
-              className="display border-b border-border py-2 text-sm font-bold uppercase tracking-wider"
+              className="display border-b border-border py-2 text-sm font-bold uppercase tracking-wider text-neutral-600"
+              activeProps={{
+                className:
+                  "!text-black font-black underline underline-offset-[6px] decoration-[1.5px] decoration-neutral-400",
+              }}
             >
               Contact Us
             </Link>
             <Link
               to="/privacy-policy"
               onClick={() => setOpen(false)}
-              className="display border-b border-border py-2 text-sm font-bold uppercase tracking-wider"
+              className="display border-b border-border py-2 text-sm font-bold uppercase tracking-wider text-neutral-600"
+              activeProps={{
+                className:
+                  "!text-black font-black underline underline-offset-[6px] decoration-[1.5px] decoration-neutral-400",
+              }}
             >
               Privacy Policy
             </Link>
