@@ -35,3 +35,77 @@ export function formatCaptionHtml(caption?: string | null): string {
       '<span class="text-[#00376b] font-medium no-underline cursor-pointer">$1</span>',
     );
 }
+
+export interface InstagramMediaResult {
+  success: boolean;
+  shortcode?: string;
+  type?: "video" | "image";
+  mediaUrl?: string | null;
+  videoUrl?: string | null;
+  imageUrl?: string | null;
+  rawVideoUrl?: string | null;
+  rawImageUrl?: string | null;
+  caption?: string | null;
+  likes?: number | null;
+  comments?: number | null;
+  username?: string | null;
+  profilePicUrl?: string | null;
+  dimensions?: { width: number; height: number } | null;
+  isLandscape?: boolean;
+  aspectRatio?: number | null;
+  embedUrl?: string;
+  error?: string;
+}
+
+/**
+ * Resilient Instagram media fetcher with dual-endpoint fallback:
+ * 1. Tries same-origin /api/media/instagram (reverse proxied)
+ * 2. If reverse proxy fails (e.g. net::ERR_CONTENT_DECODING_FAILED or 5xx),
+ *    immediately falls back to direct Hostinger CORS endpoint.
+ */
+export async function fetchInstagramMedia(
+  rawUrl?: string | null,
+): Promise<InstagramMediaResult | null> {
+  if (!rawUrl) return null;
+  const shortcode = extractInstagramShortcode(rawUrl);
+  const canonical = shortcode
+    ? `https://www.instagram.com/p/${shortcode}/`
+    : normalizeInstagramUrl(rawUrl);
+  if (!canonical) return null;
+
+  const encoded = encodeURIComponent(canonical);
+  const endpoints = [
+    `/api/media/instagram?url=${encoded}`,
+    `https://aliceblue-goose-490382.hostingersite.com/api/media/instagram?url=${encoded}`,
+  ];
+
+  for (const ep of endpoints) {
+    try {
+      const res = await fetch(ep, {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as InstagramMediaResult;
+      if (
+        data &&
+        (data.success ||
+          data.videoUrl ||
+          data.rawVideoUrl ||
+          data.imageUrl ||
+          data.rawImageUrl)
+      ) {
+        return {
+          ...data,
+          success: true,
+          shortcode: data.shortcode || shortcode || undefined,
+        };
+      }
+    } catch (err) {
+      // Primary proxy may encounter ERR_CONTENT_DECODING_FAILED or network issue; fallback will succeed
+      console.warn(`[instagram-fetcher] Endpoint ${ep} failed, trying fallback if available:`, err);
+    }
+  }
+
+  return null;
+}
+

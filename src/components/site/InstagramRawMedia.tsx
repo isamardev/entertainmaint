@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 
-import { extractInstagramShortcode, normalizeInstagramUrl } from "@/lib/instagram";
+import {
+  extractInstagramShortcode,
+  normalizeInstagramUrl,
+  fetchInstagramMedia,
+} from "@/lib/instagram";
 import { registerScrollAutoPlay } from "@/lib/video-autoplay";
 
 interface InstagramMediaState {
@@ -47,15 +51,7 @@ export function InstagramRawMedia({ url, className = "" }: InstagramRawMediaProp
       return;
     }
 
-    const endpoint = `/api/media/instagram?url=${encodeURIComponent(canonicalUrl)}`;
-
-    fetch(endpoint)
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`Media fetch returned HTTP ${res.status}`);
-        }
-        return res.json();
-      })
+    fetchInstagramMedia(canonicalUrl)
       .then((data) => {
         if (isCancelled) return;
         if (!data || !data.success) {

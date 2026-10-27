@@ -7,7 +7,12 @@ import { ArticleCard } from "@/components/site/ArticleCard";
 import { ShareButtons } from "@/components/site/ShareButtons";
 import { TrendingSidebar, SmartStickySidebar } from "@/components/site/Sidebar";
 import { InstagramRawMedia } from "@/components/site/InstagramRawMedia";
-import { extractInstagramShortcode, normalizeInstagramUrl, formatCaptionHtml } from "@/lib/instagram";
+import {
+  extractInstagramShortcode,
+  normalizeInstagramUrl,
+  formatCaptionHtml,
+  fetchInstagramMedia,
+} from "@/lib/instagram";
 import { initArticleVideoAutoPlay, registerScrollAutoPlay } from "@/lib/video-autoplay";
 import { shortDate } from "@/lib/format";
 
@@ -203,6 +208,25 @@ function ArticlePage() {
     // - Pauses immediately when user scrolls past it (up or down)
     const cleanupProseVideos = initArticleVideoAutoPlay(root);
 
+    // Helper to render styled fallback button if extraction fails or encounters network error
+    const renderFallback = (wrap: HTMLElement, permalink: string) => {
+      wrap.className =
+        "w-full max-w-md mx-auto my-6 p-6 sm:p-8 bg-neutral-50 rounded-xl border border-neutral-200 text-center shadow-xs flex flex-col items-center";
+      wrap.style.height = "auto";
+      wrap.style.minHeight = "auto";
+      wrap.style.maxHeight = "none";
+      wrap.innerHTML = `
+        <div class="w-12 h-12 mb-3.5 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-sm">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        </div>
+        <span class="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">Instagram Post</span>
+        <p class="text-sm text-neutral-700 font-medium mb-4">View full post and media on Instagram</p>
+        <a href="${permalink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-700 hover:via-pink-700 hover:to-amber-600 text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all duration-200 no-underline">
+          <span>View on Instagram</span>
+        </a>
+      `;
+    };
+
     // Hydrate inline Instagram embeds with raw media only (video or image) and fallback button
     const igWrappers = root.querySelectorAll<HTMLElement>(
       ".instagram-embed-frame-wrap[data-instagram-shortcode]",
@@ -213,30 +237,14 @@ function ArticlePage() {
       wrap.setAttribute("data-ig-processed", "1");
       const permalink = `https://www.instagram.com/p/${shortcode}/`;
 
-      fetch(`/api/media/instagram?url=${encodeURIComponent(permalink)}`)
-        .then((res) => (res.ok ? res.json() : null))
+      fetchInstagramMedia(permalink)
         .then((data) => {
           if (
             !data ||
             !data.success ||
             (!data.videoUrl && !data.rawVideoUrl && !data.imageUrl && !data.rawImageUrl)
           ) {
-            // Render styled fallback button
-            wrap.className =
-              "w-full max-w-md mx-auto my-6 p-6 sm:p-8 bg-neutral-50 rounded-xl border border-neutral-200 text-center shadow-xs flex flex-col items-center";
-            wrap.style.height = "auto";
-            wrap.style.minHeight = "auto";
-            wrap.style.maxHeight = "none";
-            wrap.innerHTML = `
-              <div class="w-12 h-12 mb-3.5 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-sm">
-                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-              </div>
-              <span class="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">Instagram Post</span>
-              <p class="text-sm text-neutral-700 font-medium mb-4">View full post and media on Instagram</p>
-              <a href="${permalink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-700 hover:via-pink-700 hover:to-amber-600 text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all duration-200 no-underline">
-                <span>View on Instagram</span>
-              </a>
-            `;
+            renderFallback(wrap, permalink);
             return;
           }
 
@@ -359,9 +367,13 @@ function ArticlePage() {
                 );
               }
             }
+          } else {
+            renderFallback(wrap, permalink);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          renderFallback(wrap, permalink);
+        });
     });
 
     // Auto-resize official Instagram iframes based on Instagram's MEASURE events

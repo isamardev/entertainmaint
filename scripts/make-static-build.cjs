@@ -77,6 +77,11 @@ ProxyRequests Off
   RequestHeader set Origin "https://entertainment-trends.com"
   RequestHeader set Referer "https://entertainment-trends.com/"
   RequestHeader unset X-Forwarded-Host
+
+  # Prevent upstream double compression & corrupted encoding (ERR_CONTENT_DECODING_FAILED):
+  # Instruct upstream backend to send raw uncompressed response, avoiding encoding mismatch.
+  RequestHeader unset Accept-Encoding
+  SetEnvIf Request_URI "^/api/" no-gzip 1
 </IfModule>
 
 # ----------- SPA FALLBACK -----------
