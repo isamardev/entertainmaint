@@ -182,7 +182,7 @@ export function PrivacyPolicyForm() {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                 activeTab === "preview"
                   ? "bg-black text-white"
-                  : "bg-white text-neutral-700 hover:bg-neutral-200 border border-neutral-300"
+                  : "bg-white text-neutral-700 hover:bg-black hover:text-white border border-neutral-300"
               }`}
             >
               <Eye size={14} />
@@ -195,7 +195,7 @@ export function PrivacyPolicyForm() {
               <button
                 type="button"
                 onClick={() => insertTag("<section>\n  <h2>", "</h2>\n  <p>Content...</p>\n</section>\n", "Section Title")}
-                className="px-2 py-1 text-xs font-bold bg-white hover:bg-neutral-200 border border-neutral-300 rounded text-neutral-800 cursor-pointer"
+                className="px-2 py-1 text-xs font-bold bg-white hover:bg-black hover:text-white border border-neutral-300 rounded text-neutral-800 cursor-pointer transition-colors"
                 title="Add Section"
               >
                 + Section
@@ -203,42 +203,42 @@ export function PrivacyPolicyForm() {
               <button
                 type="button"
                 onClick={() => insertTag("<h2>", "</h2>", "Section Heading")}
-                className="px-2 py-1 text-xs font-bold bg-white hover:bg-neutral-200 border border-neutral-300 rounded text-neutral-800 cursor-pointer"
+                className="px-2 py-1 text-xs font-bold bg-white hover:bg-black hover:text-white border border-neutral-300 rounded text-neutral-800 cursor-pointer transition-colors"
               >
                 H2
               </button>
               <button
                 type="button"
                 onClick={() => insertTag("<h3>", "</h3>", "Subheading")}
-                className="px-2 py-1 text-xs font-bold bg-white hover:bg-neutral-200 border border-neutral-300 rounded text-neutral-800 cursor-pointer"
+                className="px-2 py-1 text-xs font-bold bg-white hover:bg-black hover:text-white border border-neutral-300 rounded text-neutral-800 cursor-pointer transition-colors"
               >
                 H3
               </button>
               <button
                 type="button"
                 onClick={() => insertTag("<p>", "</p>", "Paragraph text")}
-                className="px-2 py-1 text-xs font-bold bg-white hover:bg-neutral-200 border border-neutral-300 rounded text-neutral-800 cursor-pointer"
+                className="px-2 py-1 text-xs font-bold bg-white hover:bg-black hover:text-white border border-neutral-300 rounded text-neutral-800 cursor-pointer transition-colors"
               >
                 Paragraph
               </button>
               <button
                 type="button"
                 onClick={() => insertTag("<ul>\n  <li>", "</li>\n  <li>Item 2</li>\n</ul>", "List item")}
-                className="px-2 py-1 text-xs font-bold bg-white hover:bg-neutral-200 border border-neutral-300 rounded text-neutral-800 cursor-pointer"
+                className="px-2 py-1 text-xs font-bold bg-white hover:bg-black hover:text-white border border-neutral-300 rounded text-neutral-800 cursor-pointer transition-colors"
               >
                 List
               </button>
               <button
                 type="button"
                 onClick={() => insertTag("<strong>", "</strong>", "bold text")}
-                className="px-2 py-1 text-xs font-bold bg-white hover:bg-neutral-200 border border-neutral-300 rounded text-neutral-800 cursor-pointer font-serif"
+                className="px-2 py-1 text-xs font-bold bg-white hover:bg-black hover:text-white border border-neutral-300 rounded text-neutral-800 cursor-pointer font-serif transition-colors"
               >
                 B
               </button>
               <button
                 type="button"
                 onClick={() => insertTag('<a href="https://..." class="underline">', "</a>", "link text")}
-                className="px-2 py-1 text-xs font-bold bg-white hover:bg-neutral-200 border border-neutral-300 rounded text-neutral-800 cursor-pointer"
+                className="px-2 py-1 text-xs font-bold bg-white hover:bg-black hover:text-white border border-neutral-300 rounded text-neutral-800 cursor-pointer transition-colors"
               >
                 Link
               </button>

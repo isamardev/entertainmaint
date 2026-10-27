@@ -234,8 +234,8 @@ export function ContactMessagesInbox() {
           onClick={() => setStatusFilter("unread")}
           className={`border cursor-pointer transition-all p-5 rounded-lg shadow-sm flex items-center justify-between ${
             statusFilter === "unread"
-              ? "border-yellow bg-yellow/10 ring-2 ring-yellow"
-              : "border-neutral-200 bg-white hover:border-yellow/50"
+              ? "border-black bg-neutral-100 ring-2 ring-black"
+              : "border-neutral-200 bg-white hover:border-black/40"
           }`}
         >
           <div>
@@ -244,13 +244,13 @@ export function ContactMessagesInbox() {
                 Unread Messages
               </span>
               {unreadCount > 0 && (
-                <span className="inline-block w-2 h-2 rounded-full bg-yellow animate-pulse" />
+                <span className="inline-block w-2 h-2 rounded-full bg-red-600 animate-pulse" />
               )}
             </div>
             <div className="text-3xl font-black mt-1 text-black flex items-baseline gap-2">
               {unreadCount}
               {unreadCount > 0 && (
-                <span className="text-xs font-bold bg-yellow px-2 py-0.5 rounded text-black uppercase tracking-wider">
+                <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
                   Needs Attention
                 </span>
               )}
@@ -259,7 +259,7 @@ export function ContactMessagesInbox() {
               {unreadCount === 0 ? "Inbox is fully caught up" : "Awaiting response"}
             </div>
           </div>
-          <div className="w-12 h-12 rounded-full bg-yellow/20 flex items-center justify-center text-black font-black">
+          <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center text-black font-black">
             <Mail className="w-6 h-6 text-black" />
           </div>
         </div>
@@ -317,7 +317,7 @@ export function ContactMessagesInbox() {
             className={`px-3 py-1.5 rounded transition-all ${
               statusFilter === "all"
                 ? "bg-black text-white shadow-sm"
-                : "text-neutral-600 hover:text-black"
+                : "text-neutral-600 hover:bg-black hover:text-white"
             }`}
           >
             All ({totalCount})
@@ -328,12 +328,18 @@ export function ContactMessagesInbox() {
             className={`px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
               statusFilter === "unread"
                 ? "bg-black text-white shadow-sm"
-                : "text-neutral-600 hover:text-black"
+                : "text-neutral-600 hover:bg-black hover:text-white"
             }`}
           >
             <span>Unread</span>
             {unreadCount > 0 && (
-              <span className="bg-yellow text-black text-[10px] font-black px-1.5 py-0.2 rounded-full">
+              <span
+                className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                  statusFilter === "unread"
+                    ? "bg-white text-black"
+                    : "bg-black text-white"
+                }`}
+              >
                 {unreadCount}
               </span>
             )}
@@ -344,7 +350,7 @@ export function ContactMessagesInbox() {
             className={`px-3 py-1.5 rounded transition-all ${
               statusFilter === "read"
                 ? "bg-black text-white shadow-sm"
-                : "text-neutral-600 hover:text-black"
+                : "text-neutral-600 hover:bg-black hover:text-white"
             }`}
           >
             Read ({readCount})
@@ -358,7 +364,7 @@ export function ContactMessagesInbox() {
             onClick={() => refetch()}
             disabled={isFetching}
             title="Refresh messages"
-            className="inline-flex items-center gap-1 px-3 py-2 text-xs font-bold uppercase tracking-wider border border-neutral-300 rounded hover:bg-neutral-50 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-3 py-2 text-xs font-bold uppercase tracking-wider border border-neutral-300 rounded hover:bg-black hover:text-white transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
@@ -370,7 +376,7 @@ export function ContactMessagesInbox() {
               onClick={handleClearAllRead}
               disabled={clearingRead}
               title="Delete all read messages to clean up inbox"
-              className="inline-flex items-center gap-1 px-3 py-2 text-xs font-bold uppercase tracking-wider border border-red-200 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-3 py-2 text-xs font-bold uppercase tracking-wider border border-red-200 text-red-600 hover:bg-red-600 hover:text-white rounded transition-colors disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Clear Read</span>
@@ -434,7 +440,7 @@ export function ContactMessagesInbox() {
                   onClick={() => openMessage(msg)}
                   className={`group relative p-4 sm:p-5 cursor-pointer transition-colors flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${
                     isUnread
-                      ? "bg-yellow/5 hover:bg-yellow/10 border-l-4 border-yellow font-medium"
+                      ? "bg-neutral-50 hover:bg-neutral-100 border-l-4 border-black font-medium"
                       : "hover:bg-neutral-50 border-l-4 border-transparent"
                   }`}
                 >
@@ -448,7 +454,7 @@ export function ContactMessagesInbox() {
                       className="mt-1 flex-shrink-0 text-neutral-400 hover:text-black transition-colors"
                     >
                       {isUnread ? (
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-yellow text-black font-black text-[10px] ring-2 ring-yellow/30">
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-black text-white font-black text-[10px] ring-2 ring-neutral-300">
                           ●
                         </span>
                       ) : (
@@ -509,7 +515,7 @@ export function ContactMessagesInbox() {
                           {msg.subject || "General Inquiry"}
                         </span>
                         {isUnread && (
-                          <span className="bg-yellow text-black text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded">
+                          <span className="bg-black text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
                             New
                           </span>
                         )}
@@ -530,20 +536,10 @@ export function ContactMessagesInbox() {
                         e.stopPropagation();
                         openMessage(msg);
                       }}
-                      className="px-2.5 py-1 text-xs font-bold border border-neutral-200 rounded hover:bg-neutral-100 text-neutral-700 transition-colors"
+                      className="px-2.5 py-1 text-xs font-bold border border-neutral-200 rounded hover:bg-black hover:text-white text-neutral-700 transition-colors"
                     >
                       View
                     </button>
-
-                    <a
-                      href={`mailto:${msg.email}?subject=Re: ${encodeURIComponent(msg.subject || "Your inquiry")}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="px-2.5 py-1 text-xs font-bold border border-neutral-200 rounded hover:bg-neutral-100 text-neutral-700 transition-colors inline-flex items-center gap-1"
-                      title="Reply via Email"
-                    >
-                      <Send className="w-3 h-3" />
-                      <span className="hidden lg:inline">Reply</span>
-                    </a>
 
                     <button
                       type="button"
@@ -587,9 +583,9 @@ export function ContactMessagesInbox() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="border-b-2 border-yellow bg-black text-white p-4 sm:p-5 flex items-center justify-between">
+            <div className="border-b-2 border-black bg-black text-white p-4 sm:p-5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Mail className="w-5 h-5 text-yellow" />
+                <Mail className="w-5 h-5 text-white" />
                 <h3 className="font-black uppercase tracking-wider text-sm sm:text-base">
                   Contact Inquiry Details
                 </h3>
@@ -625,7 +621,7 @@ export function ContactMessagesInbox() {
                     <span className="text-neutral-400">•</span>
                     <a
                       href={`mailto:${selectedMessage.email}`}
-                      className="font-medium text-black underline hover:text-yellow transition-colors"
+                      className="font-medium text-black underline hover:text-neutral-600 transition-colors"
                     >
                       {selectedMessage.email}
                     </a>
@@ -671,14 +667,14 @@ export function ContactMessagesInbox() {
                 <button
                   type="button"
                   onClick={() => handleToggleRead(selectedMessage)}
-                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-neutral-300 rounded hover:bg-neutral-100 transition-colors"
+                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-neutral-300 rounded hover:bg-black hover:text-white transition-colors"
                 >
                   {selectedMessage.is_read ? "Mark as Unread" : "Mark as Read"}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeleteMessage(selectedMessage)}
-                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-red-200 text-red-600 rounded hover:bg-red-50 transition-colors inline-flex items-center gap-1"
+                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-red-200 text-red-600 rounded hover:bg-red-600 hover:text-white transition-colors inline-flex items-center gap-1"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete
@@ -686,15 +682,13 @@ export function ContactMessagesInbox() {
               </div>
 
               <div className="flex items-center gap-2">
-                <a
-                  href={`mailto:${selectedMessage.email}?subject=Re: ${encodeURIComponent(
-                    selectedMessage.subject || "Your Inquiry to Entertainment Trends",
-                  )}`}
-                  className="px-4 py-2 text-xs font-black uppercase tracking-wider bg-black text-white hover:bg-yellow hover:text-black rounded transition-colors inline-flex items-center gap-1.5"
+                <button
+                  type="button"
+                  onClick={() => setSelectedMessage(null)}
+                  className="px-4 py-2 text-xs font-black uppercase tracking-wider bg-black text-white hover:bg-neutral-800 rounded transition-colors"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  Reply via Email Client
-                </a>
+                  Close
+                </button>
               </div>
             </div>
           </div>

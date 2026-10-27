@@ -94,7 +94,7 @@ function CategoriesAdmin() {
               <button
                 type="button"
                 onClick={() => qc.invalidateQueries({ queryKey: ["categories"] })}
-                className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-100"
+                className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-600 hover:text-white transition-colors"
               >
                 Retry
               </button>
@@ -120,7 +120,7 @@ function CategoriesAdmin() {
                       setSlug(c.slug);
                       setErr(null);
                     }}
-                    className="p-1 text-black hover:text-gray-700"
+                    className="p-1.5 rounded text-black hover:bg-black hover:text-white transition-colors"
                     aria-label="Edit category"
                   >
                     <Pencil size={18} />
@@ -128,7 +128,7 @@ function CategoriesAdmin() {
                   <button
                     type="button"
                     onClick={() => setDeleteModal({ isOpen: true, id: c.id, name: c.name })}
-                    className="p-1 text-red-600 hover:text-red-800"
+                    className="p-1.5 rounded text-red-600 hover:bg-red-600 hover:text-white transition-colors"
                     aria-label="Delete category"
                   >
                     <Trash2 size={18} />
@@ -158,7 +158,7 @@ function CategoriesAdmin() {
         />
         {err && <div className="text-xs text-red-600">{err}</div>}
         <div className="grid grid-cols-2 gap-2">
-          <button className="py-2 font-black uppercase tracking-widest bg-black text-white hover:bg-gray-800">
+          <button className="py-2 font-black uppercase tracking-widest bg-black text-white hover:bg-neutral-800 transition-colors">
             {editingId != null ? "Update" : "Add"}
           </button>
           <button
@@ -169,7 +169,7 @@ function CategoriesAdmin() {
               setSlug("");
               setErr(null);
             }}
-            className="py-2 font-black uppercase tracking-widest border border-gray-300 text-black hover:bg-gray-100"
+            className="py-2 font-black uppercase tracking-widest border border-gray-300 text-black hover:bg-black hover:text-white transition-colors"
           >
             Cancel
           </button>

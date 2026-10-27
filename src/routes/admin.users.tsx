@@ -72,7 +72,7 @@ function UsersAdmin() {
             <button
               type="button"
               onClick={() => qc.invalidateQueries({ queryKey: ["admin-users"] })}
-              className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-100"
+              className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-600 hover:text-white transition-colors"
             >
               Retry
             </button>
@@ -95,7 +95,11 @@ function UsersAdmin() {
                   <button
                     key={r}
                     onClick={() => setRole(uid, r, !on)}
-                    className={`px-2 py-1 text-[0.65rem] font-black uppercase tracking-widest ${on ? "bg-black text-white" : "border border-gray-300 text-black hover:border-black"}`}
+                    className={`px-2 py-1 text-[0.65rem] font-black uppercase tracking-widest ${
+                      on
+                        ? "bg-black text-white hover:bg-neutral-800"
+                        : "border border-gray-300 text-black hover:border-black hover:bg-black hover:text-white"
+                    } transition-colors`}
                   >
                     {r.replace("_", " ")}
                   </button>

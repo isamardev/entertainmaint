@@ -86,7 +86,7 @@ function AdminArticles() {
             <button
               type="button"
               onClick={() => qc.invalidateQueries({ queryKey: ["admin-articles"] })}
-              className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-100"
+              className="shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-600 hover:text-white transition-colors"
             >
               Retry
             </button>
@@ -134,13 +134,15 @@ function AdminArticles() {
                       <Link
                         to="/admin/edit/$id"
                         params={{ id: String(a.id) }}
-                        className="p-1 text-black hover:text-gray-700"
+                        className="p-1.5 rounded text-black hover:bg-black hover:text-white transition-colors"
+                        title="Edit article"
                       >
                         <Pencil size={18} />
                       </Link>
                       <button
                         onClick={() => setDeleteModal({ isOpen: true, id: a.id, title: a.title })}
-                        className="p-1 text-red-600 hover:text-red-800"
+                        className="p-1.5 rounded text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                        title="Delete article"
                       >
                         <Trash2 size={18} />
                       </button>

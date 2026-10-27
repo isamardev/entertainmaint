@@ -83,7 +83,7 @@ export function AdminLoginForm({ redirectTo = "/admin", showBackLink = true }: P
             <span className="text-muted-foreground">Keep me signed in</span>
           </label>
           {err && (
-            <div className="border border-yellow bg-yellow/10 px-3 py-2 text-xs text-yellow">
+            <div className="border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 rounded">
               {err}
             </div>
           )}

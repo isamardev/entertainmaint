@@ -41,7 +41,7 @@ function AdminContact() {
           href="/contact"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider border border-neutral-300 rounded hover:bg-neutral-100 transition-colors"
+          className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider border border-neutral-300 rounded hover:bg-black hover:text-white transition-colors"
         >
           <span>View Public Page</span>
           <ExternalLink className="w-3.5 h-3.5" />
@@ -55,14 +55,20 @@ function AdminContact() {
           onClick={() => setActiveTab("messages")}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-bold uppercase tracking-wider transition-all border-b-2 -mb-[2px] ${
             activeTab === "messages"
-              ? "border-yellow text-black bg-yellow/10"
+              ? "border-black text-black bg-neutral-100"
               : "border-transparent text-neutral-500 hover:text-black hover:bg-neutral-50"
           }`}
         >
           <Mail className="w-4 h-4" />
           <span>Received Inquiries</span>
           {unreadCount > 0 && (
-            <span className="inline-flex items-center justify-center rounded-full bg-yellow px-2 py-0.5 text-xs font-black text-black">
+            <span
+              className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-black ${
+                activeTab === "messages"
+                  ? "bg-black text-white"
+                  : "bg-neutral-900 text-white"
+              }`}
+            >
               {unreadCount}
             </span>
           )}
@@ -73,7 +79,7 @@ function AdminContact() {
           onClick={() => setActiveTab("settings")}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-bold uppercase tracking-wider transition-all border-b-2 -mb-[2px] ${
             activeTab === "settings"
-              ? "border-yellow text-black bg-yellow/10"
+              ? "border-black text-black bg-neutral-100"
               : "border-transparent text-neutral-500 hover:text-black hover:bg-neutral-50"
           }`}
         >

@@ -128,7 +128,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <PlusCircle
                 className={`w-4 h-4 transition-colors ${
-                  isNewArticleActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isNewArticleActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>Create Article</span>
@@ -140,7 +140,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <FileText
                 className={`w-4 h-4 transition-colors ${
-                  isAllArticlesActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isAllArticlesActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>All Articles</span>
@@ -167,7 +167,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <CheckCircle2
                 className={`w-4 h-4 transition-colors ${
-                  isPublishedActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isPublishedActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>Published</span>
@@ -190,7 +190,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <FileEdit
                 className={`w-4 h-4 transition-colors ${
-                  isDraftActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isDraftActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>Drafts</span>
@@ -213,7 +213,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <Archive
                 className={`w-4 h-4 transition-colors ${
-                  isArchivedActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isArchivedActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>Archived</span>
@@ -242,7 +242,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
               <div className="flex items-center gap-2.5">
                 <FolderTree
                   className={`w-4 h-4 transition-colors ${
-                    isCategoriesActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                    isCategoriesActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                   }`}
                 />
                 <span>Manage Categories</span>
@@ -261,13 +261,17 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <Mail
                 className={`w-4 h-4 transition-colors ${
-                  isContactActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isContactActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>Contact Messages</span>
             </div>
             {unreadMessagesCount > 0 ? (
-              <span className="inline-flex items-center justify-center rounded-full bg-yellow px-2 py-0.5 text-[10px] font-black text-black">
+              <span
+                className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-black ${
+                  isContactActive ? "bg-white text-black" : "bg-black text-white"
+                }`}
+              >
                 {unreadMessagesCount}
               </span>
             ) : (
@@ -292,7 +296,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <Settings
                 className={`w-4 h-4 transition-colors ${
-                  isSettingsActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isSettingsActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>Account Settings</span>
@@ -303,7 +307,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <Share2
                 className={`w-4 h-4 transition-colors ${
-                  isSocialsActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isSocialsActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>Social Media Links</span>
@@ -314,7 +318,7 @@ export function AdminSidebar({ open = false, onClose }: Props) {
             <div className="flex items-center gap-2.5">
               <ShieldCheck
                 className={`w-4 h-4 transition-colors ${
-                  isPrivacyActive ? "text-yellow" : "text-neutral-400 group-hover:text-black"
+                  isPrivacyActive ? "text-white" : "text-neutral-400 group-hover:text-black"
                 }`}
               />
               <span>Privacy Policy</span>

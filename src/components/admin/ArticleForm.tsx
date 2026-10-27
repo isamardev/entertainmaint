@@ -1813,14 +1813,14 @@ function RichTextEditor({
               <button
                 type="button"
                 onClick={() => setLinkModal((p) => ({ ...p, isOpen: false }))}
-                className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-gray-100"
+                className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-black hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleApplyLink}
-                className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800"
+                className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800 transition-colors"
               >
                 Insert Link
               </button>
@@ -1900,14 +1900,14 @@ function RichTextEditor({
               <button
                 type="button"
                 onClick={() => setEmbedModal({ isOpen: false, url: "" })}
-                className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-gray-100"
+                className="rounded px-4 py-2 text-xs font-bold uppercase tracking-wider border border-gray-300 text-gray-700 hover:bg-black hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleApplyEmbed}
-                className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800"
+                className="rounded bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-gray-800 transition-colors"
               >
                 Insert Embed
               </button>
@@ -1943,7 +1943,7 @@ function ToolbarButton({
       aria-label={label}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded border border-transparent bg-white text-black hover:border-gray-300 hover:bg-gray-50"
+      className="flex h-9 w-9 items-center justify-center rounded border border-transparent bg-white text-black hover:border-black hover:bg-black hover:text-white transition-colors"
     >
       <Icon className="h-4 w-4" />
     </button>

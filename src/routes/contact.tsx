@@ -263,7 +263,7 @@ function ContactPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-yellow hover:text-black transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 hover:text-white transition-colors disabled:opacity-50"
                   >
                     {submitting ? (
                       <>

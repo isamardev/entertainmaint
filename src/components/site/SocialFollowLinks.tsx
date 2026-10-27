@@ -125,7 +125,7 @@ export function SocialFollowLinks({
   iconSize = 16,
   onlyNonEmpty = true,
   className = "flex gap-3",
-  linkClassName = "rounded border border-border p-2 hover:border-yellow hover:text-yellow",
+  linkClassName = "rounded border border-border p-2 hover:border-black hover:bg-black hover:text-white transition-colors",
 }: SocialFollowLinksProps) {
   const [socials, setSocials] = useState<SocialLinks | null>(null);
   useEffect(() => {

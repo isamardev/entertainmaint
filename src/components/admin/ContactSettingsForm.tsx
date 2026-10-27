@@ -796,7 +796,7 @@ export function ContactSettingsForm() {
                   <p className="text-muted-foreground">
                     {form.general_description}{" "}
                     <a
-                      className="text-black font-semibold underline underline-offset-2 hover:text-yellow"
+                      className="text-black font-semibold underline underline-offset-2 hover:text-neutral-600 transition-colors"
                       href={`mailto:${form.general_email}`}
                     >
                       {form.general_email}
@@ -811,7 +811,7 @@ export function ContactSettingsForm() {
                   <p className="text-muted-foreground">
                     {form.tips_description}{" "}
                     <a
-                      className="text-black font-semibold underline underline-offset-2 hover:text-yellow"
+                      className="text-black font-semibold underline underline-offset-2 hover:text-neutral-600 transition-colors"
                       href={`mailto:${form.tips_email}`}
                     >
                       {form.tips_email}
@@ -828,7 +828,7 @@ export function ContactSettingsForm() {
                   <p className="text-muted-foreground">
                     {form.partners_description}{" "}
                     <a
-                      className="text-black font-semibold underline underline-offset-2 hover:text-yellow"
+                      className="text-black font-semibold underline underline-offset-2 hover:text-neutral-600 transition-colors"
                       href={`mailto:${form.partners_email}`}
                     >
                       {form.partners_email}
@@ -862,7 +862,7 @@ export function ContactSettingsForm() {
 
                 {/* Additional notes if present */}
                 {form.additional_notes && (
-                  <div className="bg-yellow/10 border-l-4 border-yellow p-4 text-sm text-neutral-800">
+                  <div className="bg-neutral-100 border-l-4 border-black p-4 text-sm text-neutral-800">
                     {form.additional_notes}
                   </div>
                 )}
