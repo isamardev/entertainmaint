@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { articleService } from "@/services/articleService";
 import { ArticleCard } from "@/components/site/ArticleCard";
 import { ShareButtons } from "@/components/site/ShareButtons";
 import { TrendingSidebar, SmartStickySidebar } from "@/components/site/Sidebar";
+import { InstagramRawMedia } from "@/components/site/InstagramRawMedia";
+import { extractInstagramShortcode, normalizeInstagramUrl, formatCaptionHtml } from "@/lib/instagram";
+import { initArticleVideoAutoPlay, registerScrollAutoPlay } from "@/lib/video-autoplay";
 import { shortDate } from "@/lib/format";
 
 export const Route = createFileRoute("/article/$slug")({
@@ -66,52 +69,6 @@ export const Route = createFileRoute("/article/$slug")({
   ),
   component: ArticlePage,
 });
-
-/**
- * Normalizes any Instagram reel URL (/reel/CODE/ or /reels/CODE/) into the standard
- * canonical post URL (https://www.instagram.com/p/CODE/).
- * 
- * Crucial reason:
- * When Instagram's official embed.js processes a `/reel/` URL, it renders a stripped-down
- * "Reels Player" iframe which hides likes, comments, caption, and account header, and can
- * distort horizontal/square reels into fixed 9:16 vertical boxes.
- * When processed as `/p/CODE/`, Instagram renders the full official responsive embed with
- * account avatar, follow button, native aspect ratio player, likes, comments, and full caption.
- */
-/**
- * Extracts Instagram shortcode from /p/, /reel/, /reels/, /tv/, or /share/p/ URLs.
- */
-export function extractInstagramShortcode(url: string): string | null {
-  if (!url) return null;
-  const clean = url.trim().replace(/^[`"']+|[`"']+$/g, "");
-  const match = clean.match(/instagram\.com\/(?:p|reel|reels|tv|share\/p)\/([A-Za-z0-9_-]+)/i);
-  return match && match[1] ? match[1] : null;
-}
-
-export function normalizeInstagramUrl(url: string): string {
-  if (!url) return url;
-  const shortcode = extractInstagramShortcode(url);
-  if (shortcode) {
-    return `https://www.instagram.com/p/${shortcode}/`;
-  }
-  return url.trim().replace(/^[`"']+|[`"']+$/g, "");
-}
-
-export function formatCaptionHtml(caption?: string | null): string {
-  if (!caption) return "";
-  const escape = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const safe = escape(caption);
-  return safe
-    .replace(
-      /(#[a-zA-Z0-9_\u0080-\uFFFF]+)/g,
-      '<span class="text-[#00376b] font-medium hover:underline cursor-pointer">$1</span>',
-    )
-    .replace(
-      /(@[a-zA-Z0-9_.]+)/g,
-      '<span class="text-[#00376b] font-medium hover:underline cursor-pointer">$1</span>',
-    )
-}
 
 function ArticlePage() {
   const { article } = Route.useLoaderData();
@@ -241,6 +198,172 @@ function ArticlePage() {
       }
     }
 
+    // Smart Viewport Scroll Autoplay & Pause for all prose videos and hydrated embeds:
+    // - Autoplays when user scrolls and stops at the video
+    // - Pauses immediately when user scrolls past it (up or down)
+    const cleanupProseVideos = initArticleVideoAutoPlay(root);
+
+    // Hydrate inline Instagram embeds with raw media only (video or image) and fallback button
+    const igWrappers = root.querySelectorAll<HTMLElement>(
+      ".instagram-embed-frame-wrap[data-instagram-shortcode]",
+    );
+    igWrappers.forEach((wrap) => {
+      const shortcode = wrap.getAttribute("data-instagram-shortcode");
+      if (!shortcode || wrap.getAttribute("data-ig-processed") === "1") return;
+      wrap.setAttribute("data-ig-processed", "1");
+      const permalink = `https://www.instagram.com/p/${shortcode}/`;
+
+      fetch(`/api/media/instagram?url=${encodeURIComponent(permalink)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (
+            !data ||
+            !data.success ||
+            (!data.videoUrl && !data.rawVideoUrl && !data.imageUrl && !data.rawImageUrl)
+          ) {
+            // Render styled fallback button
+            wrap.className =
+              "w-full max-w-md mx-auto my-6 p-6 sm:p-8 bg-neutral-50 rounded-xl border border-neutral-200 text-center shadow-xs flex flex-col items-center";
+            wrap.style.height = "auto";
+            wrap.style.minHeight = "auto";
+            wrap.style.maxHeight = "none";
+            wrap.innerHTML = `
+              <div class="w-12 h-12 mb-3.5 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-sm">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+              </div>
+              <span class="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">Instagram Post</span>
+              <p class="text-sm text-neutral-700 font-medium mb-4">View full post and media on Instagram</p>
+              <a href="${permalink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-700 hover:via-pink-700 hover:to-amber-600 text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all duration-200 no-underline">
+                <span>View on Instagram</span>
+              </a>
+            `;
+            return;
+          }
+
+          const isVideo = data.type === "video" || Boolean(data.videoUrl || data.rawVideoUrl);
+          const chosenVideo = data.videoUrl || data.rawVideoUrl;
+          const chosenImage = data.imageUrl || data.rawImageUrl;
+
+          const ratio =
+            data.aspectRatio ||
+            (data.dimensions?.width && data.dimensions?.height
+              ? data.dimensions.width / data.dimensions.height
+              : null);
+          const isVertical = ratio ? ratio < 0.95 : false;
+
+          if (isVideo && chosenVideo) {
+            wrap.className =
+              "w-fit max-w-full mx-auto my-6 flex justify-center items-center overflow-hidden rounded-xl bg-transparent border-0";
+            wrap.style.height = "auto";
+            wrap.style.minHeight = "auto";
+            wrap.style.maxHeight = "none";
+            wrap.style.padding = "0";
+            wrap.style.backgroundColor = "transparent";
+            wrap.style.border = "none";
+            wrap.style.boxShadow = "none";
+            if (isVertical) {
+              wrap.style.maxWidth = "min(100%, 420px)";
+            }
+
+            const initialStyle =
+              isVertical && ratio
+                ? `max-height:80vh; width:auto; max-width:min(100%, 420px); aspect-ratio:${ratio}; background-color:transparent;`
+                : "max-height:80vh; width:auto; max-width:100%; background-color:transparent;";
+
+            wrap.innerHTML = `
+              <video class="block mx-auto rounded-xl shadow-md w-auto max-w-full max-h-[80vh] object-contain bg-transparent" style="${initialStyle}" src="${chosenVideo}" poster="${chosenImage || ''}" autoplay muted loop playsinline controls preload="auto" referrerpolicy="no-referrer"></video>
+            `;
+            const v = wrap.querySelector("video");
+            if (v) {
+              v.muted = true;
+              v.play().catch(() => {});
+
+              const adjustVideo = () => {
+                if (v.videoWidth && v.videoHeight) {
+                  const r = v.videoWidth / v.videoHeight;
+                  v.style.aspectRatio = `${r}`;
+                  if (v.videoHeight > v.videoWidth) {
+                    wrap.style.maxWidth = "min(100%, 420px)";
+                    v.style.maxWidth = "min(100%, 420px)";
+                    v.style.width = "auto";
+                  } else {
+                    wrap.style.maxWidth = "100%";
+                    v.style.maxWidth = "100%";
+                  }
+                }
+              };
+              v.addEventListener("loadedmetadata", adjustVideo);
+              if (v.readyState >= 1) adjustVideo();
+
+              registerScrollAutoPlay(v);
+              if (data.rawVideoUrl && chosenVideo !== data.rawVideoUrl) {
+                v.addEventListener(
+                  "error",
+                  () => {
+                    v.src = data.rawVideoUrl;
+                    v.muted = true;
+                    v.play().catch(() => {});
+                  },
+                  { once: true },
+                );
+              }
+            }
+          } else if (chosenImage) {
+            wrap.className =
+              "w-fit max-w-full mx-auto my-6 flex justify-center items-center overflow-hidden rounded-xl bg-transparent border-0";
+            wrap.style.height = "auto";
+            wrap.style.minHeight = "auto";
+            wrap.style.maxHeight = "none";
+            wrap.style.padding = "0";
+            wrap.style.backgroundColor = "transparent";
+            wrap.style.border = "none";
+            wrap.style.boxShadow = "none";
+            if (isVertical) {
+              wrap.style.maxWidth = "min(100%, 460px)";
+            }
+
+            const initialImgStyle =
+              isVertical && ratio
+                ? `max-height:80vh; width:auto; max-width:min(100%, 460px); aspect-ratio:${ratio}; background-color:transparent;`
+                : "max-height:80vh; width:auto; max-width:100%; background-color:transparent;";
+
+            wrap.innerHTML = `
+              <img class="block mx-auto rounded-xl shadow-md w-auto max-w-full max-h-[80vh] object-contain bg-transparent" style="${initialImgStyle}" src="${chosenImage}" alt="Instagram media" loading="lazy" referrerpolicy="no-referrer" />
+            `;
+            const img = wrap.querySelector("img");
+            if (img) {
+              const adjustImg = () => {
+                if (img.naturalWidth && img.naturalHeight) {
+                  const r = img.naturalWidth / img.naturalHeight;
+                  img.style.aspectRatio = `${r}`;
+                  if (img.naturalHeight > img.naturalWidth) {
+                    wrap.style.maxWidth = "min(100%, 460px)";
+                    img.style.maxWidth = "min(100%, 460px)";
+                    img.style.width = "auto";
+                  } else {
+                    wrap.style.maxWidth = "100%";
+                    img.style.maxWidth = "100%";
+                  }
+                }
+              };
+              img.addEventListener("load", adjustImg);
+              if (img.complete) adjustImg();
+
+              if (data.rawImageUrl && chosenImage !== data.rawImageUrl) {
+                img.addEventListener(
+                  "error",
+                  () => {
+                    img.src = data.rawImageUrl;
+                  },
+                  { once: true },
+                );
+              }
+            }
+          }
+        })
+        .catch(() => {});
+    });
+
     // Auto-resize official Instagram iframes based on Instagram's MEASURE events
     const handleIgMessage = (event: MessageEvent) => {
       if (!event.origin || !event.origin.includes("instagram.com")) return;
@@ -263,6 +386,7 @@ function ArticlePage() {
     };
     window.addEventListener("message", handleIgMessage);
     return () => {
+      cleanupProseVideos();
       window.removeEventListener("message", handleIgMessage);
     };
   }, [articleBodyHtml]);
@@ -442,8 +566,7 @@ function formatArticleBody(body: string) {
       const permalink = permalinkMatch[1].replace(/^`|`$/g, "").replace(/&amp;/g, "&").trim();
       const shortcode = extractInstagramShortcode(permalink);
       if (!shortcode) return fullMatch;
-      const iframeSrc = `https://www.instagram.com/p/${shortcode}/embed/captioned/?cr=1&v=14`;
-      return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[540px] mx-auto text-center bg-transparent"><div class="instagram-embed-frame-wrap w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs" style="min-height:360px;"><iframe src="${iframeSrc}" title="Instagram post" class="instagram-official-iframe w-full block border-0 bg-white" style="min-height:360px; height:560px; width:100%; border:0;" scrolling="no" frameborder="0" allowtransparency="true" allowfullscreen="true" loading="lazy"></iframe></div></figure>`;
+      return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent no-underline"><div class="instagram-embed-frame-wrap w-fit max-w-full mx-auto overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 shadow-xs p-6" data-instagram-shortcode="${shortcode}" data-instagram-permalink="${permalink}"><div class="flex flex-col items-center justify-center gap-2 text-neutral-400 py-8"><span class="text-xs uppercase tracking-wider font-semibold">Loading Instagram media...</span></div></div></figure>`;
     },
   );
 
@@ -457,7 +580,7 @@ function formatArticleBody(body: string) {
         fullMatch.match(/\/v\/(\d+)/i);
       if (idMatch && idMatch[1]) {
         const videoId = idMatch[1];
-        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full max-w-[340px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="https://www.tiktok.com/embed/v2/${videoId}" title="TikTok Video" class="w-full block border-0 bg-white" style="height: 580px; min-height: 580px; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
+        return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full max-h-[80vh] mx-auto text-center bg-transparent no-underline"><div class="mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm w-fit" style="max-height:80vh; width:calc(80vh * 9 / 16); max-width:360px;"><iframe src="https://www.tiktok.com/embed/v2/${videoId}" title="TikTok Video" class="w-full h-full block border-0 bg-white" style="height: 100%; min-height: 360px; max-height: 80vh; width: 100%; border: 0;" scrolling="no" frameborder="0" allowtransparency="true"></iframe></div></figure>`;
       }
       return fullMatch;
     },
@@ -484,48 +607,68 @@ function formatArticleBody(body: string) {
 
     if (/instagram\.com/i.test(src)) {
       const shortcode = extractInstagramShortcode(src);
-      if (shortcode) {
-        const iframeSrc = `https://www.instagram.com/p/${shortcode}/embed/captioned/?cr=1&v=14`;
-        return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[540px] mx-auto text-center bg-transparent"><div class="instagram-embed-frame-wrap w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs" style="min-height:360px;"><iframe src="${iframeSrc}" title="Instagram post" class="instagram-official-iframe w-full block border-0 bg-white" style="min-height:360px; height:560px; width:100%; border:0;" scrolling="no" frameborder="0" allowtransparency="true" allowfullscreen="true" loading="lazy"></iframe></div></figure>`;
-      }
+        return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent no-underline"><div class="instagram-embed-frame-wrap w-fit max-w-full mx-auto overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 shadow-xs p-6" data-instagram-shortcode="${shortcode}" data-instagram-permalink="${src}"><div class="flex flex-col items-center justify-center gap-2 text-neutral-400 py-8"><span class="text-xs uppercase tracking-wider font-semibold">Loading Instagram media...</span></div></div></figure>`;
     }
 
     if (/facebook\.com/i.test(src)) {
       const isReel = /reel/i.test(src);
       const isVideo = /video/i.test(src);
+      if (isVideo && !src.includes("autoplay=")) {
+        src += (src.includes("?") ? "&" : "?") + "autoplay=true&mute=1";
+      }
       const containerClass = isReel
-        ? "aspect-[9/16] max-w-[340px]"
+        ? "aspect-[9/16] w-auto max-w-[calc(80vh*9/16)]"
         : isVideo
           ? "aspect-video max-w-[500px]"
           : "max-w-[480px]";
+      const containerStyle = isReel
+        ? "max-height:80vh; height:80vh; width:calc(80vh * 9 / 16); max-width:100%;"
+        : "max-height:80vh;";
       const cleanIframe = fullIframeTag.replace(/\ssrc="[^"]*"/i, ` src="${src}"`);
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="w-full ${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${cleanIframe}</div></figure>`;
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full max-h-[80vh] mx-auto text-center bg-transparent no-underline"><div class="${containerClass} mx-auto flex flex-col items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" style="${containerStyle}">${cleanIframe}</div></figure>`;
     }
 
     if (/spotify\.com/i.test(src) || /soundcloud\.com/i.test(src)) {
       const cleanIframe = fullIframeTag.replace(/\ssrc="[^"]*"/i, ` src="${src}"`);
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[540px] text-center bg-transparent"><div class="w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">${cleanIframe}</div></figure>`;
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[540px] max-h-[80vh] text-center bg-transparent no-underline"><div class="w-full max-w-[540px] max-h-[80vh] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" style="max-height:80vh;">${cleanIframe}</div></figure>`;
+    }
+
+    // Auto-play for YouTube and Vimeo video iframes
+    if (/youtube\.com|youtube-nocookie\.com|youtu\.be/i.test(src)) {
+      if (!src.includes("autoplay=")) {
+        src += (src.includes("?") ? "&" : "?") + "autoplay=1&mute=1&playsinline=1&enablejsapi=1";
+      }
+    } else if (/vimeo\.com/i.test(src)) {
+      if (!src.includes("autoplay=")) {
+        src += (src.includes("?") ? "&" : "?") + "autoplay=1&muted=1&playsinline=1&autopause=0";
+      }
     }
 
     const isVertical = /\/shorts\//i.test(src) || /tiktok\.com/i.test(src) || /\/reel\//i.test(src);
     if (isVertical) {
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-[9/16] w-full max-w-[340px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full max-h-[80vh] mx-auto text-center bg-transparent no-underline"><div class="aspect-[9/16] w-auto mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" style="max-height:80vh; height:80vh; width:calc(80vh * 9 / 16); max-width:100%;"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
     }
 
-    return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="aspect-video w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
+    return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full max-h-[80vh] mx-auto text-center bg-transparent no-underline"><div class="aspect-video w-full max-w-[540px] max-h-[80vh] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" style="max-height:80vh;"><iframe src="${src}" class="h-full w-full block border-0 bg-white" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div></figure>`;
   });
 
-  // Wrap standalone video tags: restrained, centered, bg-transparent with object-cover and natural sizing
+  // Wrap standalone video tags: ensure autoplay, muted, playsinline, loop, controls
   enriched = enriched.replace(
     /(<video\b[^>]*>(?:[\s\S]*?<\/video>|<video\b[^>]*\/>))/gi,
     (_m, videoTag) => {
       let enhancedVideo = videoTag;
+      if (!/\bautoplay\b/i.test(enhancedVideo)) enhancedVideo = enhancedVideo.replace(/<video\b/i, '<video autoplay');
+      if (!/\bmuted\b/i.test(enhancedVideo)) enhancedVideo = enhancedVideo.replace(/<video\b/i, '<video muted');
+      if (!/\bplaysinline\b/i.test(enhancedVideo)) enhancedVideo = enhancedVideo.replace(/<video\b/i, '<video playsinline');
+      if (!/\bloop\b/i.test(enhancedVideo)) enhancedVideo = enhancedVideo.replace(/<video\b/i, '<video loop');
+      if (!/\bcontrols\b/i.test(enhancedVideo)) enhancedVideo = enhancedVideo.replace(/<video\b/i, '<video controls');
+
       if (!/class="/i.test(enhancedVideo)) {
-        enhancedVideo = enhancedVideo.replace(/<video\b/i, '<video class="social-media-item w-full h-auto max-h-[85vh] object-cover rounded-xl mx-auto block"');
+        enhancedVideo = enhancedVideo.replace(/<video\b/i, '<video class="social-media-item w-auto h-auto max-h-[80vh] max-w-full object-contain rounded-xl mx-auto block"');
       } else {
-        enhancedVideo = enhancedVideo.replace(/class="([^"]*)"/i, (_cls, c) => `class="${c} social-media-item object-cover w-full h-auto max-h-[85vh] block mx-auto"`);
+        enhancedVideo = enhancedVideo.replace(/class="([^"]*)"/i, (_cls, c) => `class="${c} social-media-item object-contain w-auto h-auto max-h-[80vh] max-w-full block mx-auto"`);
       }
-      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent"><div class="social-embed-media-wrapper w-fit max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm">${enhancedVideo}</div></figure>`;
+      return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full max-h-[80vh] mx-auto text-center bg-transparent no-underline"><div class="social-embed-media-wrapper w-fit max-w-full max-h-[80vh] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm" style="max-height:80vh; width:fit-content; max-width:100%;">${enhancedVideo}</div></figure>`;
     },
   );
 
@@ -549,7 +692,7 @@ function formatArticleBody(body: string) {
   enriched = enriched.replace(embedBQRe, (_m: string, bq: string) => wrapEmbed(bq));
   enriched = enriched.replace(standaloneBQRe, (_m: string, bq: string) => wrapEmbed(bq));
 
-  // Normalize inline body images: constrain height to 80-90vh (85vh), centered, object-contain
+  // Normalize inline body images: constrain height strictly to 80vh, centered, object-contain
   enriched = enriched.replace(
     /<img\b([^>]*?)(\/?>)/gi,
     (_full, attrs, closing) => {
@@ -563,11 +706,11 @@ function formatArticleBody(body: string) {
               .split(/\s+/)
               .filter((c: string) => !/^(w-full|max-w-full|max-h-|h-)/.test(c))
               .join(" ");
-            return `class="${stripped ? stripped + " " : ""}max-h-[85vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block"`;
+            return `class="${stripped ? stripped + " " : ""}max-h-[80vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block"`;
           },
         );
       } else {
-        cleanAttrs = ` class="max-h-[85vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block"${cleanAttrs}`;
+        cleanAttrs = ` class="max-h-[80vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block"${cleanAttrs}`;
       }
       if (!/loading=/i.test(cleanAttrs)) {
         cleanAttrs += ' loading="lazy"';
@@ -648,8 +791,10 @@ function sanitizeRichText(html: string) {
       if (cite) {
         try {
           const u = new URL(cite);
-          if (u.protocol === "http:" || u.protocol === "https:")
-            attrs.push(`cite="${u.toString().replace(/"/g, "&quot;")}"`);
+          if (u.protocol === "http:" || u.protocol === "https:") {
+            const escapedCite = u.toString().replace(/"/g, "&quot;");
+            attrs.push(`cite="${escapedCite}"`);
+          }
         } catch {
           /* ignore */
         }
@@ -659,8 +804,10 @@ function sanitizeRichText(html: string) {
       const dir = (tag.match(/\sdir="([^"]*)"/i) || [])[1];
       if (dir === "ltr" || dir === "rtl" || dir === "auto") attrs.push(`dir="${dir}"`);
       const style = (tag.match(/\sstyle="([^"]*)"/i) || tag.match(/\sstyle='([^']*)'/i) || [])[1];
-      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style))
-        attrs.push(`style="${style.replace(/"/g, "&quot;")}"`);
+      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style)) {
+        const escapedStyle = style.replace(/"/g, "&quot;");
+        attrs.push(`style="${escapedStyle}"`);
+      }
       const dataRe = /\sdata-([a-zA-Z0-9_-]+)="([^"]*)"/g;
       let dm: RegExpExecArray | null;
       while ((dm = dataRe.exec(tag))) {
@@ -682,8 +829,10 @@ function sanitizeRichText(html: string) {
       const clazz = (tag.match(/\sclass="([^"]*)"/i) || [])[1];
       if (clazz && /^[a-zA-Z0-9_\s\-:\[\]\/%.#]+$/.test(clazz)) attrs.push(`class="${clazz}"`);
       const style = (tag.match(/\sstyle="([^"]*)"/i) || tag.match(/\sstyle='([^']*)'/i) || [])[1];
-      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style))
-        attrs.push(`style="${style.replace(/"/g, "&quot;")}"`);
+      if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style)) {
+        const escapedStyle = style.replace(/"/g, "&quot;");
+        attrs.push(`style="${escapedStyle}"`);
+      }
       const dataRe = /\sdata-([a-zA-Z0-9_-]+)="([^"]*)"/g;
       let dm: RegExpExecArray | null;
       while ((dm = dataRe.exec(tag))) {
@@ -727,7 +876,8 @@ function sanitizeRichText(html: string) {
         attrs.push(`class="${clazz}"`);
       }
       if (style && style.length <= 300 && /^[\w\s:;,%#()\.\!\-]+$/.test(style)) {
-        attrs.push(`style="${style.replace(/"/g, "&quot;")}"`);
+        const escapedStyle = style.replace(/"/g, "&quot;");
+        attrs.push(`style="${escapedStyle}"`);
       }
       return `<${tagName}${attrs.length ? " " + attrs.join(" ") : ""}${close}`;
     }
@@ -840,84 +990,7 @@ function escapeHtml(value: string) {
 }
 
 function InstagramEmbed({ permalink }: { permalink: string }) {
-  const shortcode = extractInstagramShortcode(permalink);
-  const canonicalUrl = shortcode
-    ? `https://www.instagram.com/p/${shortcode}/`
-    : normalizeInstagramUrl(permalink);
-  const iframeSrc = shortcode
-    ? `https://www.instagram.com/p/${shortcode}/embed/captioned/?cr=1&v=14`
-    : `${canonicalUrl.replace(/\/+$/, "")}/embed/captioned/?cr=1&v=14`;
-
-  // Start with clean default height: 420px for landscape, 560px for square/standard
-  const [height, setHeight] = useState<number>(560);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // If server media metadata detects horizontal/landscape, tighten initial height to 420px
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/media/instagram?url=${encodeURIComponent(canonicalUrl)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
-        if (data.isLandscape || (data.aspectRatio && data.aspectRatio > 1.2)) {
-          setHeight((prev) => (prev > 440 ? 420 : prev));
-        } else if (data.aspectRatio && data.aspectRatio < 0.8) {
-          setHeight((prev) => (prev < 680 ? 700 : prev));
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [canonicalUrl]);
-
-  // Listen to Instagram's official MEASURE & MOUNTED postMessage events to snap to exact height
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (!event.origin || !event.origin.includes("instagram.com")) return;
-      if (iframeRef.current && event.source !== iframeRef.current.contentWindow) return;
-      try {
-        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (data && (data.type === "MEASURE" || data.type === "MOUNTED") && data.details?.height) {
-          const h = Number(data.details.height);
-          if (h && h > 100 && h < 1400) {
-            setHeight(h);
-          }
-        }
-      } catch {}
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  return (
-    <figure className="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[540px] mx-auto text-center bg-transparent">
-      <div
-        className="instagram-embed-frame-wrap w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-[height] duration-200"
-        style={{ minHeight: "360px", height: `${height}px` }}
-      >
-        <iframe
-          ref={iframeRef}
-          src={iframeSrc}
-          title="Instagram post"
-          className="instagram-official-iframe w-full block border-0 bg-white"
-          style={{
-            height: `${height}px`,
-            width: "100%",
-            border: 0,
-            overflow: "hidden",
-            display: "block",
-          }}
-          scrolling="no"
-          frameBorder="0"
-          allowTransparency={true}
-          allowFullScreen={true}
-          loading="lazy"
-        />
-      </div>
-    </figure>
-  );
+  return <InstagramRawMedia url={permalink} />;
 }
 
 function EmbeddedPost({ url }: { url: string }) {
@@ -975,13 +1048,13 @@ function EmbeddedPost({ url }: { url: string }) {
 
   if (!embed) {
     return (
-      <div className="mb-8 border border-gray-200 bg-white p-4">
-        <div className="display mb-2 text-lg font-black uppercase">Related Post</div>
+      <div className="mb-8 border border-gray-200 bg-white p-4 max-h-[80vh] overflow-hidden no-underline" style={{ maxHeight: "80vh" }}>
+        <div className="display mb-2 text-lg font-black uppercase no-underline">Related Post</div>
         <a
           href={url}
           target="_blank"
           rel="noreferrer"
-          className="break-all text-sm font-bold text-black underline"
+          className="break-all text-sm font-bold text-black no-underline hover:text-neutral-700"
         >
           {url}
         </a>
@@ -995,28 +1068,28 @@ function EmbeddedPost({ url }: { url: string }) {
 
   if (embed.type === "twitter") {
     return (
-      <section className="mb-8 w-full flex flex-col items-center justify-center">
+      <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
         <div
-          className="w-full max-w-[480px] mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden"
+          className="w-full max-w-[480px] mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden no-underline"
           style={{
-            maxHeight: "76vh",
+            maxHeight: "80vh",
             minHeight: "320px",
           }}
         >
           <div
-            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start p-2 bg-white"
+            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start p-2 bg-white no-underline"
             style={{
-              maxHeight: "76vh",
+              maxHeight: "80vh",
               scrollbarWidth: "thin",
             }}
           >
             <blockquote
-              className="twitter-tweet mx-auto"
+              className="twitter-tweet mx-auto no-underline"
               data-align="center"
               data-conversation="none"
               data-dnt="true"
             >
-              <a href={embed.permalink} target="_blank" rel="noreferrer">
+              <a href={embed.permalink} target="_blank" rel="noreferrer" className="no-underline">
                 {embed.permalink}
               </a>
             </blockquote>
@@ -1031,27 +1104,30 @@ function EmbeddedPost({ url }: { url: string }) {
       (embed as any).isShorts ||
       embed.src.includes("/shorts/") ||
       url.includes("/shorts/");
-    const maxW = isShorts ? "max-w-[340px]" : "max-w-[540px]";
-    const aspectClass = isShorts ? "aspect-[9/16]" : "aspect-video";
+    const ytAutoplaySrc = embed.src.includes("autoplay=")
+      ? embed.src
+      : `${embed.src}${embed.src.includes("?") ? "&" : "?"}autoplay=1&mute=1&playsinline=1&enablejsapi=1`;
     return (
-      <section className="mb-8 w-full flex flex-col items-center justify-center">
+      <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
         <div
-          className={`w-full ${maxW} mx-auto flex flex-col items-center justify-center bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden`}
+          className={`mx-auto flex flex-col items-center justify-center bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden no-underline ${
+            isShorts ? "aspect-[9/16] w-auto" : "w-full max-w-[540px] aspect-video"
+          }`}
           style={{
-            maxHeight: "76vh",
+            maxHeight: "80vh",
+            height: isShorts ? "80vh" : "auto",
+            width: isShorts ? "calc(80vh * 9 / 16)" : "100%",
+            maxWidth: isShorts ? "calc(80vh * 9 / 16)" : "540px",
           }}
         >
-          <div className={`${aspectClass} w-full mx-auto overflow-hidden bg-white`}>
-            <iframe
-              src={embed.src}
-              title="Embedded YouTube video"
-              className="h-full w-full block border-0 bg-white"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-              loading="lazy"
-            />
-          </div>
+          <iframe
+            src={ytAutoplaySrc}
+            title="Embedded YouTube video"
+            className="h-full w-full block border-0 bg-white"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
         </div>
       </section>
     );
@@ -1067,27 +1143,35 @@ function EmbeddedPost({ url }: { url: string }) {
     const isReel = rawHref.includes("/reel/") || rawHref.includes("/reels/");
     const fbHref = encodeURIComponent(rawHref);
     const iframeSrc = isVideo
-      ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto`
+      ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto&autoplay=true&mute=1`
       : `https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=auto`;
     const containerClass = isReel
-      ? "aspect-[9/16] max-w-[340px]"
+      ? "aspect-[9/16] w-auto"
       : isVideo
-        ? "aspect-video max-w-[500px]"
-        : "max-w-[460px]";
+        ? "aspect-video w-full max-w-[500px]"
+        : "w-full max-w-[460px]";
+    const containerStyle: React.CSSProperties = isReel
+      ? {
+          maxHeight: "80vh",
+          height: "80vh",
+          width: "calc(80vh * 9 / 16)",
+          maxWidth: "100%",
+        }
+      : {
+          maxHeight: "80vh",
+          minHeight: "320px",
+        };
 
     return (
-      <section className="mb-8 w-full flex flex-col items-center justify-center">
+      <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
         <div
-          className={`w-full ${containerClass} mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden`}
-          style={{
-            maxHeight: "76vh",
-            minHeight: "320px",
-          }}
+          className={`${containerClass} mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden no-underline`}
+          style={containerStyle}
         >
           <div
-            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start bg-white p-2"
+            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start bg-white p-2 no-underline"
             style={{
-              maxHeight: "76vh",
+              maxHeight: "80vh",
               scrollbarWidth: "thin",
             }}
           >
@@ -1098,7 +1182,9 @@ function EmbeddedPost({ url }: { url: string }) {
                 border: "none",
                 overflow: "hidden",
                 width: "100%",
-                minHeight: isReel ? "500px" : isVideo ? "300px" : "420px",
+                height: "100%",
+                minHeight: isReel ? "100%" : isVideo ? "300px" : "420px",
+                maxHeight: "80vh",
                 background: "#ffffff",
                 backgroundColor: "#ffffff",
               }}
@@ -1107,18 +1193,20 @@ function EmbeddedPost({ url }: { url: string }) {
               allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
               allowFullScreen
               title="Facebook content"
-              className="w-full mx-auto block bg-white"
+              className="w-full h-full mx-auto block bg-white"
             />
-            <div className="p-2 text-center w-full bg-white">
-              <a
-                href={rawHref}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs font-bold underline text-black break-all"
-              >
-                View on Facebook
-              </a>
-            </div>
+            {!isReel && (
+              <div className="p-2 text-center w-full bg-white no-underline">
+                <a
+                  href={rawHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-bold no-underline text-black hover:text-neutral-700 break-all"
+                >
+                  View on Facebook
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -1128,18 +1216,20 @@ function EmbeddedPost({ url }: { url: string }) {
   if (embed.type === "tiktok") {
     const videoId = embed.videoId;
     return (
-      <section className="mb-8 w-full flex flex-col items-center justify-center">
+      <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
         <div
-          className="w-full max-w-[340px] mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden"
+          className="mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden no-underline w-fit"
           style={{
-            maxHeight: "76vh",
-            minHeight: "360px",
+            maxHeight: "80vh",
+            height: "80vh",
+            width: "calc(80vh * 9 / 16)",
+            maxWidth: "360px",
           }}
         >
           <div
-            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start bg-white p-2"
+            className="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start p-1 bg-white no-underline"
             style={{
-              maxHeight: "76vh",
+              maxHeight: "80vh",
               scrollbarWidth: "thin",
             }}
           >
@@ -1147,20 +1237,20 @@ function EmbeddedPost({ url }: { url: string }) {
               <iframe
                 src={`https://www.tiktok.com/embed/v2/${videoId}`}
                 title="TikTok video"
-                className="w-full block border-0 bg-white"
-                style={{ height: "560px", minHeight: "480px", width: "100%", border: 0 }}
+                className="w-full h-full block border-0 bg-white"
+                style={{ height: "100%", minHeight: "360px", width: "100%", border: 0 }}
                 scrolling="no"
                 frameBorder="0"
                 allowTransparency
               />
             ) : (
               <blockquote
-                className="tiktok-embed mx-auto"
+                className="tiktok-embed mx-auto no-underline"
                 cite={embed.permalink}
                 style={{ maxWidth: "325px", minWidth: "260px", margin: "0 auto", background: "#ffffff" }}
               >
                 <section>
-                  <a href={embed.permalink} target="_blank" rel="noreferrer">
+                  <a href={embed.permalink} target="_blank" rel="noreferrer" className="no-underline hover:text-neutral-700">
                     {embed.permalink}
                   </a>
                 </section>
@@ -1174,15 +1264,14 @@ function EmbeddedPost({ url }: { url: string }) {
 
   if (embed.type === "vimeo") {
     return (
-      <section className="mb-8 w-full flex flex-col items-center justify-center">
-        <div className="aspect-video w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
+        <div className="aspect-video w-full max-w-[540px] max-h-[80vh] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" style={{ maxHeight: "80vh" }}>
           <iframe
-            src={`https://player.vimeo.com/video/${embed.id}`}
+            src={`https://player.vimeo.com/video/${embed.id}?autoplay=1&muted=1&playsinline=1&autopause=0`}
             title="Vimeo video"
             className="h-full w-full block border-0 bg-white"
             allow="autoplay; fullscreen; picture-in-picture"
             allowFullScreen
-            loading="lazy"
           />
         </div>
       </section>
@@ -1191,14 +1280,14 @@ function EmbeddedPost({ url }: { url: string }) {
 
   if (embed.type === "threads") {
     return (
-      <section className="mb-8 w-full flex flex-col items-center justify-center">
-        <div className="w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-left">
-          <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Threads Post</div>
+      <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
+        <div className="w-full max-w-[500px] max-h-[80vh] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-left no-underline" style={{ maxHeight: "80vh" }}>
+          <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 no-underline">Threads Post</div>
           <a
             href={embed.permalink}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-semibold text-black hover:underline block break-all"
+            className="text-sm font-semibold text-black no-underline hover:text-neutral-700 block break-all"
           >
             View this post on Threads
           </a>
@@ -1211,8 +1300,8 @@ function EmbeddedPost({ url }: { url: string }) {
     const isCompact = embed.embedType === "track" || embed.embedType === "episode";
     const height = isCompact ? "152" : "352";
     return (
-      <section className="mb-8 w-full flex flex-col items-center justify-center">
-        <div className="w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
+        <div className="w-full max-w-[540px] max-h-[80vh] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" style={{ maxHeight: "80vh" }}>
           <iframe
             src={`https://open.spotify.com/embed/${embed.embedType}/${embed.id}`}
             width="100%"
@@ -1229,14 +1318,14 @@ function EmbeddedPost({ url }: { url: string }) {
   }
 
   return (
-    <section className="mb-8 w-full flex flex-col items-center justify-center">
-      <div className="w-full max-w-[460px] mx-auto border border-gray-200 rounded-xl bg-white p-4 shadow-xs" style={{ maxHeight: "76vh" }}>
-        <div className="display mb-2 text-lg font-black uppercase">Embedded Post</div>
+    <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
+      <div className="w-full max-w-[460px] max-h-[80vh] mx-auto border border-gray-200 rounded-xl bg-white p-4 shadow-xs no-underline" style={{ maxHeight: "80vh" }}>
+        <div className="display mb-2 text-lg font-black uppercase no-underline">Embedded Post</div>
         <a
           href={(embed as any)?.href ?? url}
           target="_blank"
           rel="noreferrer"
-          className="break-all text-sm font-bold text-black underline"
+          className="break-all text-sm font-bold text-black no-underline hover:text-neutral-700"
         >
           {(embed as any)?.href ?? url}
         </a>
@@ -1320,7 +1409,7 @@ function getEmbedConfig(url: string) {
       if (videoId) {
         return {
           type: "youtube" as const,
-          src: `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`,
+          src: `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&autoplay=1&mute=1&playsinline=1&enablejsapi=1`,
           isShorts,
         };
       }

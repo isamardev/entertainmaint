@@ -34,14 +34,39 @@ export default defineConfig({
             if (!instagramModules) return next();
             const { getInstagramMedia, streamInstagramMedia } = instagramModules;
             const urlObj = new URL(req.url || "", "http://localhost:3000");
-            if (urlObj.pathname === "/api/media/instagram") {
-              const url = urlObj.searchParams.get("url");
+
+            if (urlObj.pathname === "/api/media/instagram" || urlObj.pathname === "/api/instagram") {
+              let url = urlObj.searchParams.get("url");
+
+              // Handle POST body if needed
+              if (!url && req.method === "POST") {
+                try {
+                  const buffers: Buffer[] = [];
+                  for await (const chunk of req) {
+                    buffers.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+                  }
+                  const rawBody = Buffer.concat(buffers).toString("utf-8");
+                  const json = JSON.parse(rawBody);
+                  if (json && typeof json.url === "string") url = json.url;
+                } catch {}
+              }
+
               if (!url) {
-                res.writeHead(400, { "Content-Type": "application/json" });
-                return res.end(JSON.stringify({ success: false, error: "Missing url" }));
+                res.writeHead(400, {
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "*",
+                });
+                return res.end(JSON.stringify({ success: false, error: "Missing url parameter" }));
               }
               try {
                 const result = await getInstagramMedia(url);
+                const proxiedVideo = result.videoUrl
+                  ? `/api/media/instagram/stream?url=${encodeURIComponent(result.videoUrl)}`
+                  : null;
+                const proxiedImage = result.imageUrl
+                  ? `/api/media/instagram/image?url=${encodeURIComponent(result.imageUrl)}`
+                  : null;
+
                 res.writeHead(200, {
                   "Content-Type": "application/json",
                   "Access-Control-Allow-Origin": "*",
@@ -49,24 +74,26 @@ export default defineConfig({
                 return res.end(
                   JSON.stringify({
                     ...result,
-                    videoUrl: result.videoUrl
-                      ? `/api/media/instagram/stream?url=${encodeURIComponent(result.videoUrl)}`
-                      : null,
-                    imageUrl: result.imageUrl
-                      ? `/api/media/instagram/image?url=${encodeURIComponent(result.imageUrl)}`
-                      : null,
+                    mediaUrl: proxiedVideo || proxiedImage || result.videoUrl || result.imageUrl,
+                    videoUrl: proxiedVideo,
+                    imageUrl: proxiedImage,
                     rawVideoUrl: result.videoUrl,
                     rawImageUrl: result.imageUrl,
                   })
                 );
-              } catch (err) {
-                res.writeHead(500, { "Content-Type": "application/json" });
+              } catch (err: any) {
+                res.writeHead(500, {
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "*",
+                });
                 return res.end(JSON.stringify({ success: false, error: err.message }));
               }
             }
             if (
               urlObj.pathname === "/api/media/instagram/stream" ||
-              urlObj.pathname === "/api/media/instagram/image"
+              urlObj.pathname === "/api/media/instagram/image" ||
+              urlObj.pathname === "/api/instagram/stream" ||
+              urlObj.pathname === "/api/instagram/image"
             ) {
               const targetUrl = urlObj.searchParams.get("url");
               return streamInstagramMedia(targetUrl, req, res);

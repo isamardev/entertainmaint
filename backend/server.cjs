@@ -742,37 +742,46 @@ app.get("/api/health", (req, res) => {
 
 const { getInstagramMedia, streamInstagramMedia } = require("./lib/instagram-media.cjs");
 
-app.get("/api/media/instagram", async (req, res) => {
-  const url = req.query.url;
+const handleInstagramMediaRequest = async (req, res) => {
+  const url = req.query.url || req.body?.url;
   if (!url) return res.status(400).json({ success: false, error: "Missing url parameter" });
   try {
     const result = await getInstagramMedia(url);
     if (!result.success) return res.status(400).json(result);
+    const proxiedVideo = result.videoUrl
+      ? `/api/media/instagram/stream?url=${encodeURIComponent(result.videoUrl)}`
+      : null;
+    const proxiedImage = result.imageUrl
+      ? `/api/media/instagram/image?url=${encodeURIComponent(result.imageUrl)}`
+      : null;
     return res.json({
       ...result,
-      videoUrl: result.videoUrl
-        ? `/api/media/instagram/stream?url=${encodeURIComponent(result.videoUrl)}`
-        : null,
-      imageUrl: result.imageUrl
-        ? `/api/media/instagram/image?url=${encodeURIComponent(result.imageUrl)}`
-        : null,
+      mediaUrl: proxiedVideo || proxiedImage || result.videoUrl || result.imageUrl,
+      videoUrl: proxiedVideo,
+      imageUrl: proxiedImage,
       rawVideoUrl: result.videoUrl,
       rawImageUrl: result.imageUrl,
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
-});
+};
 
-app.get("/api/media/instagram/stream", (req, res) => {
+app.get("/api/media/instagram", handleInstagramMediaRequest);
+app.post("/api/media/instagram", handleInstagramMediaRequest);
+app.get("/api/instagram", handleInstagramMediaRequest);
+app.post("/api/instagram", handleInstagramMediaRequest);
+
+const handleInstagramStream = (req, res) => {
   const targetUrl = req.query.url;
   streamInstagramMedia(targetUrl, req, res);
-});
+};
 
-app.get("/api/media/instagram/image", (req, res) => {
-  const targetUrl = req.query.url;
-  streamInstagramMedia(targetUrl, req, res);
-});
+app.get("/api/media/instagram/stream", handleInstagramStream);
+app.get("/api/instagram/stream", handleInstagramStream);
+app.get("/api/media/instagram/image", handleInstagramStream);
+app.get("/api/instagram/image", handleInstagramStream);
+
 
 async function ensureDefaultAdmin() {
   const count = await Admin.count();

@@ -163,6 +163,35 @@ function parseEmbedHtml(data) {
     }
   }
 
+  if (!imageUrl) {
+    const thumbMatch =
+      data.match(/\\"thumbnail_src\\":\\"((?:\\\\.|[^\\])+?)\\"/) ||
+      data.match(/"thumbnail_src":"([^"]+)"/);
+    if (thumbMatch && thumbMatch[1]) {
+      imageUrl = cleanMediaUrl(thumbMatch[1]);
+    }
+  }
+
+  if (!imageUrl) {
+    const resMatches = data.matchAll(/\\"src\\":\\"((?:\\\\.|[^\\])+?)\\"/g);
+    let bestResUrl = null;
+    for (const m of resMatches) {
+      const u = cleanMediaUrl(m[1]);
+      if (u && (u.includes(".jpg") || u.includes(".jpeg") || u.includes(".webp") || u.includes("cdninstagram.com"))) {
+        bestResUrl = u;
+      }
+    }
+    if (bestResUrl) imageUrl = bestResUrl;
+  }
+
+  if (!imageUrl) {
+    const scontentMatch =
+      data.match(/https:(?:\\\/\\\/|\/\/)[a-zA-Z0-9_\-\.]*scontent[a-zA-Z0-9_\-\.]*\.cdninstagram\.com(?:\\\/|\/)[^\s"'<>\\]+\.(?:jpg|jpeg|webp)[^\s"'<>\\]*/i);
+    if (scontentMatch) {
+      imageUrl = cleanMediaUrl(scontentMatch[0]);
+    }
+  }
+
   // 3. Caption text
   const capIdx = data.indexOf("edge_media_to_caption");
   if (capIdx !== -1) {
@@ -301,16 +330,90 @@ function getInstagramMedia(rawUrl) {
         if (successRequest) break;
       }
 
+      // Fallback Strategy 1: Open-source vxinstagram mirror (for public posts blocked by Instagram login walls)
+      if (!finalResult.videoUrl && !finalResult.imageUrl) {
+        try {
+          const vxOpts = {
+            hostname: "vxinstagram.com",
+            path: `/${detectPathType(rawUrl)}/${shortcode}`,
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+              Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+            timeout: 5000,
+          };
+          const vxRes = await httpsGetWithRedirects(vxOpts, 2);
+          if (vxRes && vxRes.body) {
+            const ogVideo =
+              vxRes.body.match(/<meta[^>]+property=["']og:video["'][^>]+content=["']([^"']+)["']/i) ||
+              vxRes.body.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:video["']/i);
+            if (ogVideo && ogVideo[1]) {
+              finalResult.videoUrl = cleanMediaUrl(ogVideo[1]);
+            }
+            const ogImg =
+              vxRes.body.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+              vxRes.body.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+              vxRes.body.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+            if (ogImg && ogImg[1]) {
+              finalResult.imageUrl = cleanMediaUrl(ogImg[1]);
+            }
+          }
+        } catch (_vxErr) {}
+      }
+
+      // Fallback Strategy 2: RapidAPI snippet if RAPIDAPI_KEY is configured
+      if (!finalResult.videoUrl && !finalResult.imageUrl && process.env.RAPIDAPI_KEY) {
+        try {
+          const apiKey = process.env.RAPIDAPI_KEY;
+          const apiHost =
+            process.env.RAPIDAPI_HOST ||
+            "instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com";
+          const rapidOpts = {
+            hostname: apiHost,
+            path: `/get-info-rapidapi?url=${encodeURIComponent(`https://www.instagram.com/p/${shortcode}/`)}`,
+            headers: {
+              "x-rapidapi-key": apiKey,
+              "x-rapidapi-host": apiHost,
+            },
+            timeout: 6000,
+          };
+          const rapidRes = await httpsGetWithRedirects(rapidOpts, 2);
+          if (rapidRes && rapidRes.body) {
+            const data = JSON.parse(rapidRes.body);
+            const directUrl =
+              data?.download_url ||
+              data?.url ||
+              data?.media ||
+              data?.video_url ||
+              data?.image_url;
+            if (directUrl) {
+              if (directUrl.includes(".mp4") || data.type === "video") {
+                finalResult.videoUrl = cleanMediaUrl(directUrl);
+              } else {
+                finalResult.imageUrl = cleanMediaUrl(directUrl);
+              }
+            }
+          }
+        } catch (_rapidErr) {}
+      }
+
       const isLandscape =
         finalResult.dimensions &&
         finalResult.dimensions.width > finalResult.dimensions.height;
 
+      const isVideo = Boolean(finalResult.videoUrl);
+      const chosenMediaUrl = finalResult.videoUrl || finalResult.imageUrl || null;
+
       const result = {
         success: successRequest || !!(finalResult.videoUrl || finalResult.imageUrl),
         shortcode,
-        type: finalResult.videoUrl ? "video" : "image",
+        type: isVideo ? "video" : "image",
+        mediaUrl: chosenMediaUrl,
         videoUrl: finalResult.videoUrl,
         imageUrl: finalResult.imageUrl,
+        rawVideoUrl: finalResult.videoUrl,
+        rawImageUrl: finalResult.imageUrl,
         caption: finalResult.caption,
         likes: finalResult.likes,
         comments: finalResult.comments,

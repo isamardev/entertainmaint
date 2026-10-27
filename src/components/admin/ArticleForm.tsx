@@ -1161,7 +1161,7 @@ function RichTextEditor({
     const safeSrc = String(src).replace(/"/g, "&quot;");
     return (
       '<figure class="my-6 flex flex-col items-center justify-center bg-white">' +
-      `<img src="${safeSrc}" alt="${safeAlt}" class="max-h-[85vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block" loading="lazy" />` +
+      `<img src="${safeSrc}" alt="${safeAlt}" class="max-h-[80vh] w-auto max-w-full rounded border border-gray-200 bg-white object-contain mx-auto block" loading="lazy" />` +
       "</figure><p><br></p>"
     );
   }
@@ -1170,8 +1170,8 @@ function RichTextEditor({
     const safeSrc = String(src).replace(/"/g, "&quot;");
     return (
       '<figure class="my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-white">' +
-      '<div class="w-full max-w-[580px] mx-auto overflow-hidden rounded border border-gray-200 bg-white shadow-sm">' +
-      `<video src="${safeSrc}" class="w-full h-auto max-h-[500px] bg-white" controls playsinline preload="metadata" poster=""></video>` +
+      '<div class="w-full max-w-[580px] max-h-[80vh] mx-auto overflow-hidden rounded border border-gray-200 bg-white shadow-sm" style="max-height:80vh;">' +
+      `<video src="${safeSrc}" class="w-full h-auto max-h-[80vh] bg-white" controls autoplay muted loop playsinline preload="auto" poster=""></video>` +
       "</div>" +
       "</figure><p><br></p>"
     );
@@ -1467,7 +1467,7 @@ function RichTextEditor({
       const isReel = permalink.includes("/reel/") || permalink.includes("/reels/");
       const fbHref = encodeURIComponent(cleanUrl);
       const iframeSrc = isVideo
-        ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto`
+        ? `https://www.facebook.com/plugins/video.php?href=${fbHref}&show_text=false&width=auto&autoplay=true&mute=1`
         : `https://www.facebook.com/plugins/post.php?href=${fbHref}&show_text=true&width=auto`;
       const containerClass = isReel
         ? "aspect-[9/16] max-w-[340px]"
@@ -1546,7 +1546,7 @@ function RichTextEditor({
         return null;
       })();
       if (videoId) {
-        const src = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`.replace(/"/g, "&quot;");
+        const src = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&autoplay=1&mute=1&playsinline=1&enablejsapi=1`.replace(/"/g, "&quot;");
         const isVertical = parsed.pathname.startsWith("/shorts/") || parsed.pathname.includes("/shorts/");
         const aspectClass = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video max-w-[540px]";
         return {
@@ -1567,10 +1567,10 @@ function RichTextEditor({
       return {
         platform: "Threads Post",
         html:
-          `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[500px] text-center bg-transparent" contenteditable="false" data-art-block="1">` +
-          `<div class="w-full max-w-[500px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-left">` +
-          `<div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Threads Post</div>` +
-          `<a href="${safePermalink}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-black hover:underline block break-all">View this post on Threads</a>` +
+          `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto max-w-[500px] text-center bg-transparent no-underline" contenteditable="false" data-art-block="1">` +
+          `<div class="w-full max-w-[500px] max-h-[80vh] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-left no-underline" style="max-height:80vh;">` +
+          `<div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 no-underline">Threads Post</div>` +
+          `<a href="${safePermalink}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-black no-underline hover:text-neutral-700 block break-all">View this post on Threads</a>` +
           `</div></figure><p><br></p>`,
       };
     }
@@ -1584,7 +1584,7 @@ function RichTextEditor({
           html:
             `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
             `<div class="aspect-video w-full max-w-[540px] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">` +
-            `<iframe src="https://player.vimeo.com/video/${id}" title="Vimeo video" class="h-full w-full block border-0 bg-white" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>` +
+            `<iframe src="https://player.vimeo.com/video/${id}?autoplay=1&muted=1&playsinline=1&autopause=0" title="Vimeo video" class="h-full w-full block border-0 bg-white" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>` +
             `</div></figure><p><br></p>`,
         };
       }
