@@ -242,6 +242,16 @@ function parseEmbedHtml(data) {
     dimensions = { width, height };
   }
 
+  // 7. Carousel detection
+  const isSidecar =
+    /"isSidecar"\s*:\s*true/i.test(data) ||
+    /GraphSidecar/i.test(data) ||
+    /edge_sidecar_to_children/i.test(data) ||
+    /CAROUSEL_ITEM/i.test(data) ||
+    /"carousel_media"/i.test(data) ||
+    Boolean(imageUrl && (imageUrl.includes("CAROUSEL_ITEM") || imageUrl.includes("carousel"))) ||
+    Boolean(caption && /swipe\s*(to|left|through|for)/i.test(caption));
+
   return {
     videoUrl,
     imageUrl,
@@ -252,6 +262,7 @@ function parseEmbedHtml(data) {
     profilePicUrl,
     dimensions,
     isLoginWall,
+    isCarousel: Boolean(isSidecar && !videoUrl),
   };
 }
 
@@ -403,12 +414,14 @@ function getInstagramMedia(rawUrl) {
         finalResult.dimensions.width > finalResult.dimensions.height;
 
       const isVideo = Boolean(finalResult.videoUrl);
+      const isCarousel = !isVideo && Boolean(finalResult.isCarousel);
       const chosenMediaUrl = finalResult.videoUrl || finalResult.imageUrl || null;
 
       const result = {
         success: successRequest || !!(finalResult.videoUrl || finalResult.imageUrl),
         shortcode,
-        type: isVideo ? "video" : "image",
+        type: isVideo ? "video" : isCarousel ? "carousel" : "image",
+        isCarousel: Boolean(isCarousel),
         mediaUrl: chosenMediaUrl,
         videoUrl: finalResult.videoUrl,
         imageUrl: finalResult.imageUrl,

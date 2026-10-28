@@ -616,18 +616,30 @@ figure[class*="inline-embed"] {
   max-height: 80vh !important;
 }
 
-/* Embed post maximum height strictly 80vh */
-figure.inline-embed,
-figure.inline-embed > div,
-figure[class*="inline-embed"],
-.instagram-embed-frame-wrap,
+/* Embed post maximum height strictly 80vh (except Instagram carousel which has full view) */
+figure.inline-embed:not(.instagram-carousel-figure):not(:has(.instagram-carousel-wrap)):not(:has(iframe.instagram-official-iframe)),
+figure.inline-embed:not(.instagram-carousel-figure) > div:not(.instagram-carousel-wrap),
+figure[class*="inline-embed"]:not(.instagram-carousel-figure):not(:has(.instagram-carousel-wrap)):not(:has(iframe.instagram-official-iframe)),
+.instagram-embed-frame-wrap:not(.instagram-carousel-wrap),
 .instagram-embed-frame-wrap video,
-.instagram-embed-frame-wrap iframe,
 .social-embed-media-wrapper,
 .social-embed-media-wrapper video,
-section:has(iframe) > div,
-section:has(.instagram-embed-frame-wrap) {
+section:has(iframe:not(.instagram-official-iframe)) > div:not(.instagram-carousel-wrap),
+section:has(.instagram-embed-frame-wrap:not(.instagram-carousel-wrap)) {
   max-height: 80vh !important;
+}
+
+/* Instagram carousel post: full view without 80vh cutoff */
+.instagram-carousel-figure,
+figure.instagram-carousel-figure,
+.instagram-carousel-wrap,
+figure:has(.instagram-carousel-wrap),
+div:has(.instagram-carousel-wrap),
+figure:has(iframe.instagram-official-iframe),
+div:has(iframe.instagram-official-iframe),
+iframe.instagram-official-iframe {
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 /* Instagram raw media: hug video dimensions, zero black pillarboxing, clean transparent canvas */

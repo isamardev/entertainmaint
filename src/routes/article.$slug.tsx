@@ -208,8 +208,34 @@ function ArticlePage() {
     // - Pauses immediately when user scrolls past it (up or down)
     const cleanupProseVideos = initArticleVideoAutoPlay(root);
 
-    // Helper to render styled fallback button if extraction fails or encounters network error
-    const renderFallback = (wrap: HTMLElement, permalink: string) => {
+    // Helper to render styled fallback: if shortcode exists, render official iframe with full view
+    const renderFallback = (wrap: HTMLElement, permalink: string, shortcode?: string | null) => {
+      if (shortcode) {
+        wrap.className =
+          "instagram-carousel-wrap w-full max-w-[540px] mx-auto my-8 flex flex-col justify-center items-center bg-transparent border-0";
+        wrap.style.height = "auto";
+        wrap.style.minHeight = "480px";
+        wrap.style.maxHeight = "none";
+        wrap.style.overflow = "visible";
+        wrap.style.padding = "0";
+        wrap.style.backgroundColor = "transparent";
+        wrap.style.border = "none";
+        wrap.style.boxShadow = "none";
+        wrap.innerHTML = `
+          <iframe
+            class="instagram-official-iframe w-full max-w-[540px] mx-auto block rounded-xl border border-gray-200 bg-white shadow-sm"
+            src="https://www.instagram.com/p/${shortcode}/embed/captioned/"
+            style="width: 100%; max-width: 540px; min-height: 480px; height: 620px; max-height: none; border: 1px solid #e5e7eb; border-radius: 12px; display: block; overflow: hidden; background: #ffffff;"
+            scrolling="no"
+            frameborder="0"
+            allowtransparency="true"
+            loading="lazy"
+            title="Instagram Post"
+          ></iframe>
+        `;
+        return;
+      }
+
       wrap.className =
         "w-full max-w-md mx-auto my-6 p-6 sm:p-8 bg-neutral-50 rounded-xl border border-neutral-200 text-center shadow-xs flex flex-col items-center";
       wrap.style.height = "auto";
@@ -227,7 +253,10 @@ function ArticlePage() {
       `;
     };
 
-    // Hydrate inline Instagram embeds with raw media only (video or image) and fallback button
+    // Hydrate inline Instagram embeds:
+    // - Videos: native HTML <video controls> with autoplay (working great)
+    // - Carousel posts: official Instagram iframe with full view so users can swipe through all slides
+    // - Single images: clean native <img> tag
     const igWrappers = root.querySelectorAll<HTMLElement>(
       ".instagram-embed-frame-wrap[data-instagram-shortcode]",
     );
@@ -244,11 +273,19 @@ function ArticlePage() {
             !data.success ||
             (!data.videoUrl && !data.rawVideoUrl && !data.imageUrl && !data.rawImageUrl)
           ) {
-            renderFallback(wrap, permalink);
+            renderFallback(wrap, permalink, shortcode);
             return;
           }
 
           const isVideo = data.type === "video" || Boolean(data.videoUrl || data.rawVideoUrl);
+          const isCarousel =
+            !isVideo &&
+            (data.type === "carousel" ||
+              Boolean(data.isCarousel) ||
+              Boolean(data.imageUrl?.includes("CAROUSEL")) ||
+              Boolean(data.rawImageUrl?.includes("CAROUSEL")) ||
+              Boolean(data.caption && /swipe\s*(to|left|through|for)/i.test(data.caption)));
+
           const chosenVideo = data.videoUrl || data.rawVideoUrl;
           const chosenImage = data.imageUrl || data.rawImageUrl;
 
@@ -316,6 +353,31 @@ function ArticlePage() {
                 );
               }
             }
+          } else if (isCarousel) {
+            // Instagram carousel post: render as iframe with full view for interactive swiping
+            wrap.className =
+              "instagram-carousel-wrap w-full max-w-[540px] mx-auto my-8 flex flex-col justify-center items-center bg-transparent border-0";
+            wrap.style.height = "auto";
+            wrap.style.minHeight = "480px";
+            wrap.style.maxHeight = "none";
+            wrap.style.overflow = "visible";
+            wrap.style.padding = "0";
+            wrap.style.backgroundColor = "transparent";
+            wrap.style.border = "none";
+            wrap.style.boxShadow = "none";
+
+            wrap.innerHTML = `
+              <iframe
+                class="instagram-official-iframe w-full max-w-[540px] mx-auto block rounded-xl border border-gray-200 bg-white shadow-sm"
+                src="https://www.instagram.com/p/${shortcode}/embed/captioned/"
+                style="width: 100%; max-width: 540px; min-height: 480px; height: 620px; max-height: none; border: 1px solid #e5e7eb; border-radius: 12px; display: block; overflow: hidden; background: #ffffff;"
+                scrolling="no"
+                frameborder="0"
+                allowtransparency="true"
+                loading="lazy"
+                title="Instagram Carousel Post"
+              ></iframe>
+            `;
           } else if (chosenImage) {
             wrap.className =
               "w-fit max-w-full mx-auto my-6 flex justify-center items-center overflow-hidden rounded-xl bg-transparent border-0";
@@ -368,11 +430,11 @@ function ArticlePage() {
               }
             }
           } else {
-            renderFallback(wrap, permalink);
+            renderFallback(wrap, permalink, shortcode);
           }
         })
         .catch(() => {
-          renderFallback(wrap, permalink);
+          renderFallback(wrap, permalink, shortcode);
         });
     });
 
@@ -383,13 +445,18 @@ function ArticlePage() {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (data && (data.type === "MEASURE" || data.type === "MOUNTED") && data.details?.height) {
           const h = Number(data.details.height);
-          if (h && h > 100 && h < 1400) {
+          if (h && h > 100 && h < 1600) {
             const iframes = root.querySelectorAll<HTMLIFrameElement>("iframe.instagram-official-iframe");
             iframes.forEach((ifr) => {
               if (ifr.contentWindow === event.source) {
                 ifr.style.height = `${h}px`;
-                const parentWrap = ifr.closest(".instagram-embed-frame-wrap") as HTMLElement | null;
-                if (parentWrap) parentWrap.style.height = `${h}px`;
+                ifr.style.maxHeight = "none";
+                const parentWrap = ifr.closest(".instagram-embed-frame-wrap, .instagram-carousel-wrap") as HTMLElement | null;
+                if (parentWrap) {
+                  parentWrap.style.height = `${h}px`;
+                  parentWrap.style.maxHeight = "none";
+                  parentWrap.style.overflow = "visible";
+                }
               }
             });
           }

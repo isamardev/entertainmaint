@@ -39,7 +39,8 @@ export function formatCaptionHtml(caption?: string | null): string {
 export interface InstagramMediaResult {
   success: boolean;
   shortcode?: string;
-  type?: "video" | "image";
+  type?: "video" | "image" | "carousel";
+  isCarousel?: boolean;
   mediaUrl?: string | null;
   videoUrl?: string | null;
   imageUrl?: string | null;
