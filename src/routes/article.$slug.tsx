@@ -6,14 +6,21 @@ import { articleService } from "@/services/articleService";
 import { ArticleCard } from "@/components/site/ArticleCard";
 import { ShareButtons } from "@/components/site/ShareButtons";
 import { TrendingSidebar, SmartStickySidebar } from "@/components/site/Sidebar";
-import { InstagramRawMedia } from "@/components/site/InstagramRawMedia";
+import { InstagramIframeEmbed, InstagramRawMedia } from "@/components/site/InstagramRawMedia";
 import {
   extractInstagramShortcode,
   normalizeInstagramUrl,
   formatCaptionHtml,
-  fetchInstagramMedia,
+  isInstagramReel,
+  getInstagramEmbedUrl,
 } from "@/lib/instagram";
-import { initArticleVideoAutoPlay, registerScrollAutoPlay } from "@/lib/video-autoplay";
+import {
+  initArticleVideoAutoPlay,
+  registerPlayableMedia,
+  evaluateActiveVideo,
+  calculateElementVisibility,
+  registerScrollAutoPlay,
+} from "@/lib/video-autoplay";
 import { shortDate } from "@/lib/format";
 
 export const Route = createFileRoute("/article/$slug")({
@@ -60,7 +67,9 @@ export const Route = createFileRoute("/article/$slug")({
       ],
     };
   },
-  errorComponent: ({ error }) => <div className="p-8 text-center">{error.message}</div>,
+  errorComponent: ({ error }: { error: any }) => (
+    <div className="p-8 text-center">{error?.message || "An error occurred"}</div>
+  ),
   notFoundComponent: () => (
     <div className="p-8 text-center">
       <div className="display mb-4 text-xl font-black">Article not found</div>
@@ -77,6 +86,7 @@ export const Route = createFileRoute("/article/$slug")({
 
 function ArticlePage() {
   const { article } = Route.useLoaderData();
+  const articleContainerRef = useRef<HTMLDivElement | null>(null);
   const proseRef = useRef<HTMLDivElement | null>(null);
   const [moreStoriesCount, setMoreStoriesCount] = useState(6);
   const [isLoadingMoreStories, setIsLoadingMoreStories] = useState(false);
@@ -94,8 +104,9 @@ function ArticlePage() {
   const articleBodyHtml = formatArticleBody(article.body);
 
   useEffect(() => {
-    if (!proseRef.current || typeof document === "undefined") return;
-    const root = proseRef.current;
+    if (!articleContainerRef.current || typeof document === "undefined") return;
+    const container = articleContainerRef.current;
+    const root = proseRef.current || container;
     const hasTwitter = !!root.querySelector("blockquote.twitter-tweet");
     const hasTiktok = !!root.querySelector("blockquote.tiktok-embed");
     const hasFacebook = !!root.querySelector("blockquote.fb-post");
@@ -203,259 +214,29 @@ function ArticlePage() {
       }
     }
 
-    // Smart Viewport Scroll Autoplay & Pause for all prose videos and hydrated embeds:
-    // - Autoplays when user scrolls and stops at the video
+    // Smart Viewport Scroll Autoplay & Pause for ALL videos & embeds:
+    // - Autoplays when user scrolls to a video/embed post (closest to viewport center)
     // - Pauses immediately when user scrolls past it (up or down)
-    const cleanupProseVideos = initArticleVideoAutoPlay(root);
+    // - Automatically plays the next video in view ("assy he chlta rehy")
+    const cleanupVideos = initArticleVideoAutoPlay(container);
 
-    // Helper to render styled fallback: if shortcode exists, render official iframe with full view
-    const renderFallback = (wrap: HTMLElement, permalink: string, shortcode?: string | null) => {
-      if (shortcode) {
-        wrap.className =
-          "instagram-carousel-wrap w-full max-w-[540px] mx-auto my-8 flex flex-col justify-center items-center bg-transparent border-0";
-        wrap.style.height = "auto";
-        wrap.style.minHeight = "480px";
-        wrap.style.maxHeight = "none";
-        wrap.style.overflow = "visible";
-        wrap.style.padding = "0";
-        wrap.style.backgroundColor = "transparent";
-        wrap.style.border = "none";
-        wrap.style.boxShadow = "none";
-        wrap.innerHTML = `
-          <iframe
-            class="instagram-official-iframe w-full max-w-[540px] mx-auto block rounded-xl border border-gray-200 bg-white shadow-sm"
-            src="https://www.instagram.com/p/${shortcode}/embed/captioned/"
-            style="width: 100%; max-width: 540px; min-height: 480px; height: 620px; max-height: none; border: 1px solid #e5e7eb; border-radius: 12px; display: block; overflow: hidden; background: #ffffff;"
-            scrolling="no"
-            frameborder="0"
-            allowtransparency="true"
-            loading="lazy"
-            title="Instagram Post"
-          ></iframe>
-        `;
-        return;
-      }
-
-      wrap.className =
-        "w-full max-w-md mx-auto my-6 p-6 sm:p-8 bg-neutral-50 rounded-xl border border-neutral-200 text-center shadow-xs flex flex-col items-center";
-      wrap.style.height = "auto";
-      wrap.style.minHeight = "auto";
-      wrap.style.maxHeight = "none";
-      wrap.innerHTML = `
-        <div class="w-12 h-12 mb-3.5 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-sm">
-          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-        </div>
-        <span class="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">Instagram Post</span>
-        <p class="text-sm text-neutral-700 font-medium mb-4">View full post and media on Instagram</p>
-        <a href="${permalink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-700 hover:via-pink-700 hover:to-amber-600 text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all duration-200 no-underline">
-          <span>View on Instagram</span>
-        </a>
-      `;
-    };
-
-    // Hydrate inline Instagram embeds:
-    // - Videos: native HTML <video controls> with autoplay (working great)
-    // - Carousel posts: official Instagram iframe with full view so users can swipe through all slides
-    // - Single images: clean native <img> tag
-    const igWrappers = root.querySelectorAll<HTMLElement>(
-      ".instagram-embed-frame-wrap[data-instagram-shortcode]",
-    );
-    igWrappers.forEach((wrap) => {
-      const shortcode = wrap.getAttribute("data-instagram-shortcode");
-      if (!shortcode || wrap.getAttribute("data-ig-processed") === "1") return;
-      wrap.setAttribute("data-ig-processed", "1");
-      const permalink = `https://www.instagram.com/p/${shortcode}/`;
-
-      fetchInstagramMedia(permalink)
-        .then((data) => {
-          if (
-            !data ||
-            !data.success ||
-            (!data.videoUrl && !data.rawVideoUrl && !data.imageUrl && !data.rawImageUrl)
-          ) {
-            renderFallback(wrap, permalink, shortcode);
-            return;
-          }
-
-          const isVideo = data.type === "video" || Boolean(data.videoUrl || data.rawVideoUrl);
-          const isCarousel =
-            !isVideo &&
-            (data.type === "carousel" ||
-              Boolean(data.isCarousel) ||
-              Boolean(data.imageUrl?.includes("CAROUSEL")) ||
-              Boolean(data.rawImageUrl?.includes("CAROUSEL")) ||
-              Boolean(data.caption && /swipe\s*(to|left|through|for)/i.test(data.caption)));
-
-          const chosenVideo = data.videoUrl || data.rawVideoUrl;
-          const chosenImage = data.imageUrl || data.rawImageUrl;
-
-          const ratio =
-            data.aspectRatio ||
-            (data.dimensions?.width && data.dimensions?.height
-              ? data.dimensions.width / data.dimensions.height
-              : null);
-          const isVertical = ratio ? ratio < 0.95 : false;
-
-          if (isVideo && chosenVideo) {
-            wrap.className =
-              "w-fit max-w-full mx-auto my-6 flex justify-center items-center overflow-hidden rounded-xl bg-transparent border-0";
-            wrap.style.height = "auto";
-            wrap.style.minHeight = "auto";
-            wrap.style.maxHeight = "none";
-            wrap.style.padding = "0";
-            wrap.style.backgroundColor = "transparent";
-            wrap.style.border = "none";
-            wrap.style.boxShadow = "none";
-            if (isVertical) {
-              wrap.style.maxWidth = "min(100%, 420px)";
-            }
-
-            const initialStyle =
-              isVertical && ratio
-                ? `max-height:80vh; width:auto; max-width:min(100%, 420px); aspect-ratio:${ratio}; background-color:transparent;`
-                : "max-height:80vh; width:auto; max-width:100%; background-color:transparent;";
-
-            wrap.innerHTML = `
-              <video class="block mx-auto rounded-xl shadow-md w-auto max-w-full max-h-[80vh] object-contain bg-transparent" style="${initialStyle}" src="${chosenVideo}" poster="${chosenImage || ''}" autoplay muted loop playsinline controls preload="auto" referrerpolicy="no-referrer"></video>
-            `;
-            const v = wrap.querySelector("video");
-            if (v) {
-              v.muted = true;
-              v.play().catch(() => {});
-
-              const adjustVideo = () => {
-                if (v.videoWidth && v.videoHeight) {
-                  const r = v.videoWidth / v.videoHeight;
-                  v.style.aspectRatio = `${r}`;
-                  if (v.videoHeight > v.videoWidth) {
-                    wrap.style.maxWidth = "min(100%, 420px)";
-                    v.style.maxWidth = "min(100%, 420px)";
-                    v.style.width = "auto";
-                  } else {
-                    wrap.style.maxWidth = "100%";
-                    v.style.maxWidth = "100%";
-                  }
-                }
-              };
-              v.addEventListener("loadedmetadata", adjustVideo);
-              if (v.readyState >= 1) adjustVideo();
-
-              registerScrollAutoPlay(v);
-              if (data.rawVideoUrl && chosenVideo !== data.rawVideoUrl) {
-                v.addEventListener(
-                  "error",
-                  () => {
-                    v.src = data.rawVideoUrl;
-                    v.muted = true;
-                    v.play().catch(() => {});
-                  },
-                  { once: true },
-                );
-              }
-            }
-          } else if (isCarousel) {
-            // Instagram carousel post: render as iframe with full view for interactive swiping
-            wrap.className =
-              "instagram-carousel-wrap w-full max-w-[540px] mx-auto my-8 flex flex-col justify-center items-center bg-transparent border-0";
-            wrap.style.height = "auto";
-            wrap.style.minHeight = "480px";
-            wrap.style.maxHeight = "none";
-            wrap.style.overflow = "visible";
-            wrap.style.padding = "0";
-            wrap.style.backgroundColor = "transparent";
-            wrap.style.border = "none";
-            wrap.style.boxShadow = "none";
-
-            wrap.innerHTML = `
-              <iframe
-                class="instagram-official-iframe w-full max-w-[540px] mx-auto block rounded-xl border border-gray-200 bg-white shadow-sm"
-                src="https://www.instagram.com/p/${shortcode}/embed/captioned/"
-                style="width: 100%; max-width: 540px; min-height: 480px; height: 620px; max-height: none; border: 1px solid #e5e7eb; border-radius: 12px; display: block; overflow: hidden; background: #ffffff;"
-                scrolling="no"
-                frameborder="0"
-                allowtransparency="true"
-                loading="lazy"
-                title="Instagram Carousel Post"
-              ></iframe>
-            `;
-          } else if (chosenImage) {
-            wrap.className =
-              "w-fit max-w-full mx-auto my-6 flex justify-center items-center overflow-hidden rounded-xl bg-transparent border-0";
-            wrap.style.height = "auto";
-            wrap.style.minHeight = "auto";
-            wrap.style.maxHeight = "none";
-            wrap.style.padding = "0";
-            wrap.style.backgroundColor = "transparent";
-            wrap.style.border = "none";
-            wrap.style.boxShadow = "none";
-            if (isVertical) {
-              wrap.style.maxWidth = "min(100%, 460px)";
-            }
-
-            const initialImgStyle =
-              isVertical && ratio
-                ? `max-height:80vh; width:auto; max-width:min(100%, 460px); aspect-ratio:${ratio}; background-color:transparent;`
-                : "max-height:80vh; width:auto; max-width:100%; background-color:transparent;";
-
-            wrap.innerHTML = `
-              <img class="block mx-auto rounded-xl shadow-md w-auto max-w-full max-h-[80vh] object-contain bg-transparent" style="${initialImgStyle}" src="${chosenImage}" alt="Instagram media" loading="lazy" referrerpolicy="no-referrer" />
-            `;
-            const img = wrap.querySelector("img");
-            if (img) {
-              const adjustImg = () => {
-                if (img.naturalWidth && img.naturalHeight) {
-                  const r = img.naturalWidth / img.naturalHeight;
-                  img.style.aspectRatio = `${r}`;
-                  if (img.naturalHeight > img.naturalWidth) {
-                    wrap.style.maxWidth = "min(100%, 460px)";
-                    img.style.maxWidth = "min(100%, 460px)";
-                    img.style.width = "auto";
-                  } else {
-                    wrap.style.maxWidth = "100%";
-                    img.style.maxWidth = "100%";
-                  }
-                }
-              };
-              img.addEventListener("load", adjustImg);
-              if (img.complete) adjustImg();
-
-              if (data.rawImageUrl && chosenImage !== data.rawImageUrl) {
-                img.addEventListener(
-                  "error",
-                  () => {
-                    img.src = data.rawImageUrl;
-                  },
-                  { once: true },
-                );
-              }
-            }
-          } else {
-            renderFallback(wrap, permalink, shortcode);
-          }
-        })
-        .catch(() => {
-          renderFallback(wrap, permalink, shortcode);
-        });
-    });
-
-    // Auto-resize official Instagram iframes based on Instagram's MEASURE events
+    // Auto-adjust Instagram iframes based on Instagram MEASURE messages
     const handleIgMessage = (event: MessageEvent) => {
       if (!event.origin || !event.origin.includes("instagram.com")) return;
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (data && (data.type === "MEASURE" || data.type === "MOUNTED") && data.details?.height) {
           const h = Number(data.details.height);
-          if (h && h > 100 && h < 1600) {
-            const iframes = root.querySelectorAll<HTMLIFrameElement>("iframe.instagram-official-iframe");
+          if (h && h > 200 && h < 2500) {
+            const iframes = container.querySelectorAll<HTMLIFrameElement>("iframe.instagram-official-iframe");
             iframes.forEach((ifr) => {
               if (ifr.contentWindow === event.source) {
                 ifr.style.height = `${h}px`;
-                ifr.style.maxHeight = "none";
+                ifr.style.minHeight = `${h}px`;
                 const parentWrap = ifr.closest(".instagram-embed-frame-wrap, .instagram-carousel-wrap") as HTMLElement | null;
                 if (parentWrap) {
                   parentWrap.style.height = `${h}px`;
-                  parentWrap.style.maxHeight = "none";
-                  parentWrap.style.overflow = "visible";
+                  parentWrap.style.minHeight = `${h}px`;
                 }
               }
             });
@@ -465,10 +246,10 @@ function ArticlePage() {
     };
     window.addEventListener("message", handleIgMessage);
     return () => {
-      cleanupProseVideos();
+      cleanupVideos();
       window.removeEventListener("message", handleIgMessage);
     };
-  }, [articleBodyHtml]);
+  }, [articleBodyHtml, article.embed_url]);
 
   const readNext = trending.slice(0, 3);
   const moreStoriesList = trending.filter((a) => a.id !== article.id);
@@ -486,7 +267,7 @@ function ArticlePage() {
   return (
     <>
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="max-w-4xl min-w-0">
+        <div ref={articleContainerRef} className="max-w-4xl min-w-0">
           <header className="mb-6">
             <h1 className="article-headline font-serif text-xl sm:text-2xl md:text-[28px] lg:text-[32px] font-bold leading-[1.2] tracking-tight text-[#111111] mb-3 normal-case">
               {article.title}
@@ -633,6 +414,12 @@ function formatArticleBody(body: string) {
   // Normalize any inline font-size styles from rich text / WordPress so paragraph size stays uniform
   enriched = enriched.replace(/\bfont-size\s*:\s*[^;"]+;?/gi, "");
 
+  // 1. Unwrap any pre-existing raw figure/div wrappers around iframes before embed conversion
+  enriched = enriched.replace(
+    /<figure(?!\s*class="[^"]*instagram)\b[^>]*>\s*(?:<div(?!\s*class="[^"]*instagram)\b[^>]*>)?\s*(<iframe\b[\s\S]*?<\/iframe>)\s*(?:<\/div>)?\s*<\/figure>/gi,
+    "$1",
+  );
+
   // Transform Instagram blockquotes into official responsive embeds (reels/videos get .ig-embed-fit)
   enriched = enriched.replace(
     /(?:<figure[^>]*>\s*)?<blockquote\b[^>]*class="[^"]*instagram-media[^"]*"[^>]*>[\s\S]*?<\/blockquote>(?:\s*<\/figure>)?/gi,
@@ -645,7 +432,12 @@ function formatArticleBody(body: string) {
       const permalink = permalinkMatch[1].replace(/^`|`$/g, "").replace(/&amp;/g, "&").trim();
       const shortcode = extractInstagramShortcode(permalink);
       if (!shortcode) return fullMatch;
-      return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent no-underline"><div class="instagram-embed-frame-wrap w-fit max-w-full mx-auto overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 shadow-xs p-6" data-instagram-shortcode="${shortcode}" data-instagram-permalink="${permalink}"><div class="flex flex-col items-center justify-center gap-2 text-neutral-400 py-8"><span class="text-xs uppercase tracking-wider font-semibold">Loading Instagram media...</span></div></div></figure>`;
+      const isReel = isInstagramReel(permalink) || /\/reels?\/[A-Za-z0-9_-]+/i.test(permalink) || /reel/i.test(fullMatch);
+      const maxWidth = isReel ? "380px" : "540px";
+      const iframeSrc = isReel
+        ? `https://www.instagram.com/reel/${shortcode}/embed/?autoplay=1&muted=1`
+        : `https://www.instagram.com/p/${shortcode}/embed/captioned/?autoplay=1&muted=1`;
+      return `<figure class="instagram-carousel-figure my-8 flex flex-col items-center justify-center w-full mx-auto bg-transparent"><div class="instagram-carousel-wrap instagram-embed-slot w-full ${isReel ? "instagram-reel-wrap max-w-[380px]" : "max-w-[540px]"} mx-auto flex flex-col items-center justify-start bg-white rounded-xl shadow-xs border border-neutral-200" data-instagram-shortcode="${shortcode}" data-instagram-url="${permalink}" data-instagram-is-reel="${isReel ? "true" : "false"}" style="width:100%;max-width:${maxWidth};min-height:480px;overflow:visible;"><iframe class="instagram-official-iframe w-full block border-0 bg-white" src="${iframeSrc}" style="width:100%;max-width:${maxWidth};min-height:480px;border:0;display:block;overflow:visible;background:#ffffff;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen" allowfullscreen allowtransparency="true" loading="lazy" title="Instagram Post"></iframe></div></figure>`;
     },
   );
 
@@ -665,14 +457,13 @@ function formatArticleBody(body: string) {
     },
   );
 
-  // 1. Unwrap any pre-existing figure/div wrappers around iframes to prevent nested figures
-  enriched = enriched.replace(
-    /<figure\b[^>]*>\s*(?:<div\b[^>]*>)?\s*(<iframe\b[\s\S]*?<\/iframe>)\s*(?:<\/div>)?\s*<\/figure>/gi,
-    "$1",
-  );
-
   // 2. Wrap iframes cleanly with responsive containers according to platform/aspect ratio
   enriched = enriched.replace(/<iframe\b[\s\S]*?<\/iframe>/gi, (fullIframeTag) => {
+    // Avoid double-wrapping our official instagram iframe
+    if (fullIframeTag.includes("instagram-official-iframe")) {
+      return fullIframeTag;
+    }
+
     const srcMatch =
       fullIframeTag.match(/\ssrc="([^"]+)"/i) || fullIframeTag.match(/\ssrc='([^']+)'/i);
     let src = srcMatch ? srcMatch[1].trim() : "";
@@ -686,7 +477,14 @@ function formatArticleBody(body: string) {
 
     if (/instagram\.com/i.test(src)) {
       const shortcode = extractInstagramShortcode(src);
-        return `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent no-underline"><div class="instagram-embed-frame-wrap w-fit max-w-full mx-auto overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 shadow-xs p-6" data-instagram-shortcode="${shortcode}" data-instagram-permalink="${src}"><div class="flex flex-col items-center justify-center gap-2 text-neutral-400 py-8"><span class="text-xs uppercase tracking-wider font-semibold">Loading Instagram media...</span></div></div></figure>`;
+      if (shortcode) {
+        const isReel = isInstagramReel(src) || /\/reels?\/[A-Za-z0-9_-]+/i.test(src);
+        const maxWidth = isReel ? "380px" : "540px";
+        const iframeSrc = isReel
+          ? `https://www.instagram.com/reel/${shortcode}/embed/?autoplay=1&muted=1`
+          : `https://www.instagram.com/p/${shortcode}/embed/captioned/?autoplay=1&muted=1`;
+        return `<figure class="instagram-carousel-figure my-8 flex flex-col items-center justify-center w-full mx-auto bg-transparent"><div class="instagram-carousel-wrap instagram-embed-slot w-full ${isReel ? "instagram-reel-wrap max-w-[380px]" : "max-w-[540px]"} mx-auto flex flex-col items-center justify-start bg-white rounded-xl shadow-xs border border-neutral-200" data-instagram-shortcode="${shortcode}" data-instagram-url="${src}" data-instagram-is-reel="${isReel ? "true" : "false"}" style="width:100%;max-width:${maxWidth};min-height:480px;overflow:visible;"><iframe class="instagram-official-iframe w-full block border-0 bg-white" src="${iframeSrc}" style="width:100%;max-width:${maxWidth};min-height:480px;border:0;display:block;overflow:visible;background:#ffffff;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen" allowfullscreen allowtransparency="true" loading="lazy" title="Instagram Post"></iframe></div></figure>`;
+      }
     }
 
     if (/facebook\.com/i.test(src)) {
@@ -745,9 +543,39 @@ function formatArticleBody(body: string) {
       if (!/class="/i.test(enhancedVideo)) {
         enhancedVideo = enhancedVideo.replace(/<video\b/i, '<video class="social-media-item w-auto h-auto max-h-[80vh] max-w-full object-contain rounded-xl mx-auto block"');
       } else {
-        enhancedVideo = enhancedVideo.replace(/class="([^"]*)"/i, (_cls, c) => `class="${c} social-media-item object-contain w-auto h-auto max-h-[80vh] max-w-full block mx-auto"`);
+        enhancedVideo = enhancedVideo.replace(/class="([^"]*)"/i, (_cls: string, c: string) => `class="${c} social-media-item object-contain w-auto h-auto max-h-[80vh] max-w-full block mx-auto"`);
       }
       return `<figure class="inline-embed my-6 flex flex-col items-center justify-center w-full max-h-[80vh] mx-auto text-center bg-transparent no-underline"><div class="social-embed-media-wrapper w-fit max-w-full max-h-[80vh] mx-auto overflow-hidden rounded-xl border border-gray-200 bg-transparent shadow-sm" style="max-height:80vh; width:fit-content; max-width:100%;">${enhancedVideo}</div></figure>`;
+    },
+  );
+
+  // 3. Ensure any existing or pre-rendered Instagram embed wrapper divs and iframes are clean (no 95vh clamp, scrolling="no")
+  enriched = enriched.replace(
+    /(<div\b[^>]*class="[^"]*(?:instagram-carousel-wrap|instagram-embed-frame-wrap|instagram-embed-slot)[^"]*"[^>]*>)\s*(<iframe\b[\s\S]*?<\/iframe>)\s*(<\/div>)/gi,
+    (_full, divOpen, iframeContent, divClose) => {
+      const isReel =
+        divOpen.includes('data-instagram-is-reel="true"') ||
+        /\/reels?\//i.test(divOpen) ||
+        /\/reels?\//i.test(iframeContent);
+      const maxWidth = isReel ? "380px" : "540px";
+      let updatedDiv = divOpen.replace(/\bh-\[95vh\]/g, "");
+      if (/style="[^"]*"/i.test(updatedDiv)) {
+        updatedDiv = updatedDiv.replace(/style="[^"]*"/i, `style="width:100%;max-width:${maxWidth};min-height:480px;overflow:visible;"`);
+      } else {
+        updatedDiv = updatedDiv.replace(/<div\b/i, `<div style="width:100%;max-width:${maxWidth};min-height:480px;overflow:visible;"`);
+      }
+      if (isReel && !/instagram-reel-wrap/i.test(updatedDiv)) {
+        updatedDiv = updatedDiv.replace(/class="([^"]*)"/i, 'class="$1 instagram-reel-wrap max-w-[380px]"');
+      }
+      let updatedIframe = iframeContent;
+      if (/style="[^"]*"/i.test(updatedIframe)) {
+        updatedIframe = updatedIframe.replace(/style="[^"]*"/i, `style="width:100%;max-width:${maxWidth};min-height:480px;border:0;display:block;overflow:visible;background:#ffffff;"`);
+      }
+      updatedIframe = updatedIframe.replace(/scrolling="auto"/gi, 'scrolling="no"');
+      if (!/scrolling="/i.test(updatedIframe)) {
+        updatedIframe = updatedIframe.replace(/<iframe\b/i, '<iframe scrolling="no"');
+      }
+      return `${updatedDiv}${updatedIframe}${divClose}`;
     },
   );
 
@@ -1069,7 +897,7 @@ function escapeHtml(value: string) {
 }
 
 function InstagramEmbed({ permalink }: { permalink: string }) {
-  return <InstagramRawMedia url={permalink} />;
+  return <InstagramIframeEmbed url={permalink} />;
 }
 
 function EmbeddedPost({ url }: { url: string }) {
@@ -1138,6 +966,25 @@ function EmbeddedPost({ url }: { url: string }) {
           {url}
         </a>
       </div>
+    );
+  }
+
+  if (embed.type === "direct_video") {
+    return (
+      <section className="mb-8 w-full flex flex-col items-center justify-center no-underline">
+        <div className="w-fit max-w-full mx-auto flex justify-center items-center overflow-hidden rounded-xl bg-transparent">
+          <video
+            src={embed.src}
+            autoPlay
+            muted
+            loop
+            playsInline
+            controls
+            preload="auto"
+            className="block mx-auto rounded-xl shadow-md w-auto max-w-full max-h-[80vh] object-contain bg-transparent"
+          />
+        </div>
+      </section>
     );
   }
 
@@ -1436,6 +1283,16 @@ function getEmbedConfig(url: string) {
 
     const parsed = new URL(cleanUrl);
     const host = parsed.hostname.replace(/^www\./, "");
+
+    const isDirectVideo =
+      /\.(mp4|webm|mov|ogg)($|\?)/i.test(parsed.pathname) ||
+      parsed.pathname.includes("/api/uploads/");
+    if (isDirectVideo) {
+      return {
+        type: "direct_video" as const,
+        src: parsed.toString(),
+      };
+    }
 
     if (
       host === "twitter.com" ||

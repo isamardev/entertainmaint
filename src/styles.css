@@ -604,8 +604,8 @@ div[class*="aspect-[9/16]"] > iframe:not([src*="instagram.com"]):not(.instagram-
 }
 
 /* Figure & embed container centering */
-figure.inline-embed,
-figure[class*="inline-embed"] {
+figure.inline-embed:not(.instagram-carousel-figure):not(:has(.instagram-carousel-wrap)):not(:has(.instagram-embed-frame-wrap)):not(:has(iframe.instagram-official-iframe)):not(:has(iframe[src*="instagram.com"])),
+figure[class*="inline-embed"]:not(.instagram-carousel-figure):not(:has(.instagram-carousel-wrap)):not(:has(.instagram-embed-frame-wrap)):not(:has(iframe.instagram-official-iframe)):not(:has(iframe[src*="instagram.com"])) {
   margin-left: auto !important;
   margin-right: auto !important;
   text-align: center !important;
@@ -616,29 +616,61 @@ figure[class*="inline-embed"] {
   max-height: 80vh !important;
 }
 
-/* Embed post maximum height strictly 80vh (except Instagram carousel which has full view) */
-figure.inline-embed:not(.instagram-carousel-figure):not(:has(.instagram-carousel-wrap)):not(:has(iframe.instagram-official-iframe)),
-figure.inline-embed:not(.instagram-carousel-figure) > div:not(.instagram-carousel-wrap),
-figure[class*="inline-embed"]:not(.instagram-carousel-figure):not(:has(.instagram-carousel-wrap)):not(:has(iframe.instagram-official-iframe)),
-.instagram-embed-frame-wrap:not(.instagram-carousel-wrap),
-.instagram-embed-frame-wrap video,
+/* Embed post maximum height strictly 80vh (except Instagram embeds) */
+figure.inline-embed:not(.instagram-carousel-figure):not(:has(.instagram-carousel-wrap)):not(:has(.instagram-embed-frame-wrap)):not(:has(iframe.instagram-official-iframe)):not(:has(iframe[src*="instagram.com"])),
+figure.inline-embed:not(.instagram-carousel-figure) > div:not(.instagram-carousel-wrap):not(.instagram-embed-frame-wrap):not(:has(iframe.instagram-official-iframe)):not(:has(iframe[src*="instagram.com"])),
+figure[class*="inline-embed"]:not(.instagram-carousel-figure):not(:has(.instagram-carousel-wrap)):not(:has(.instagram-embed-frame-wrap)):not(:has(iframe.instagram-official-iframe)):not(:has(iframe[src*="instagram.com"])),
 .social-embed-media-wrapper,
 .social-embed-media-wrapper video,
-section:has(iframe:not(.instagram-official-iframe)) > div:not(.instagram-carousel-wrap),
-section:has(.instagram-embed-frame-wrap:not(.instagram-carousel-wrap)) {
+section:has(iframe:not(.instagram-official-iframe):not([src*="instagram.com"])) > div:not(.instagram-carousel-wrap):not(.instagram-embed-frame-wrap),
+section:has(.social-embed-media-wrapper) {
   max-height: 80vh !important;
 }
 
-/* Instagram carousel post: full view without 80vh cutoff */
+/* Instagram embed: responsive wrapper and official iframe */
+.instagram-carousel-wrap,
+.instagram-embed-frame-wrap,
+.instagram-embed-slot,
+div:has(> iframe.instagram-official-iframe),
+div:has(> iframe[src*="instagram.com"]) {
+  min-height: 480px;
+  max-height: none !important;
+  width: 100% !important;
+  max-width: 540px !important;
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+/* Instagram Reels & vertical videos: max-width 380px */
+.instagram-carousel-wrap[data-instagram-is-reel="true"],
+.instagram-embed-frame-wrap[data-instagram-is-reel="true"],
+div[data-instagram-is-reel="true"],
+.instagram-reel-wrap,
+div:has(> iframe[src*="/reel/"]),
+div:has(> iframe[src*="/reels/"]) {
+  max-width: 380px !important;
+}
+
+iframe.instagram-official-iframe,
+iframe[src*="instagram.com"] {
+  min-height: 480px;
+  max-height: none !important;
+  width: 100% !important;
+  border: 0 !important;
+  display: block !important;
+}
+
 .instagram-carousel-figure,
 figure.instagram-carousel-figure,
-.instagram-carousel-wrap,
-figure:has(.instagram-carousel-wrap),
-div:has(.instagram-carousel-wrap),
 figure:has(iframe.instagram-official-iframe),
-div:has(iframe.instagram-official-iframe),
-iframe.instagram-official-iframe {
+figure:has(iframe[src*="instagram.com"]),
+figure:has(.instagram-carousel-wrap),
+figure:has(.instagram-embed-frame-wrap) {
   max-height: none !important;
+  height: auto !important;
   overflow: visible !important;
 }
 

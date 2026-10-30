@@ -341,73 +341,7 @@ function getInstagramMedia(rawUrl) {
         if (successRequest) break;
       }
 
-      // Fallback Strategy 1: Open-source vxinstagram mirror (for public posts blocked by Instagram login walls)
-      if (!finalResult.videoUrl && !finalResult.imageUrl) {
-        try {
-          const vxOpts = {
-            hostname: "vxinstagram.com",
-            path: `/${detectPathType(rawUrl)}/${shortcode}`,
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-              Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            },
-            timeout: 5000,
-          };
-          const vxRes = await httpsGetWithRedirects(vxOpts, 2);
-          if (vxRes && vxRes.body) {
-            const ogVideo =
-              vxRes.body.match(/<meta[^>]+property=["']og:video["'][^>]+content=["']([^"']+)["']/i) ||
-              vxRes.body.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:video["']/i);
-            if (ogVideo && ogVideo[1]) {
-              finalResult.videoUrl = cleanMediaUrl(ogVideo[1]);
-            }
-            const ogImg =
-              vxRes.body.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-              vxRes.body.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
-              vxRes.body.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
-            if (ogImg && ogImg[1]) {
-              finalResult.imageUrl = cleanMediaUrl(ogImg[1]);
-            }
-          }
-        } catch (_vxErr) {}
-      }
 
-      // Fallback Strategy 2: RapidAPI snippet if RAPIDAPI_KEY is configured
-      if (!finalResult.videoUrl && !finalResult.imageUrl && process.env.RAPIDAPI_KEY) {
-        try {
-          const apiKey = process.env.RAPIDAPI_KEY;
-          const apiHost =
-            process.env.RAPIDAPI_HOST ||
-            "instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com";
-          const rapidOpts = {
-            hostname: apiHost,
-            path: `/get-info-rapidapi?url=${encodeURIComponent(`https://www.instagram.com/p/${shortcode}/`)}`,
-            headers: {
-              "x-rapidapi-key": apiKey,
-              "x-rapidapi-host": apiHost,
-            },
-            timeout: 6000,
-          };
-          const rapidRes = await httpsGetWithRedirects(rapidOpts, 2);
-          if (rapidRes && rapidRes.body) {
-            const data = JSON.parse(rapidRes.body);
-            const directUrl =
-              data?.download_url ||
-              data?.url ||
-              data?.media ||
-              data?.video_url ||
-              data?.image_url;
-            if (directUrl) {
-              if (directUrl.includes(".mp4") || data.type === "video") {
-                finalResult.videoUrl = cleanMediaUrl(directUrl);
-              } else {
-                finalResult.imageUrl = cleanMediaUrl(directUrl);
-              }
-            }
-          }
-        } catch (_rapidErr) {}
-      }
 
       const isLandscape =
         finalResult.dimensions &&

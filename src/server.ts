@@ -64,6 +64,74 @@ export default {
             headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
           });
         }
+        const shortcodeMatch = targetUrl.match(/\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+        const shortcode = shortcodeMatch ? shortcodeMatch[1] : null;
+        if (shortcode) {
+          try {
+            const https = (await import("node:https")).default;
+            const fastResult = await new Promise<{
+              type: "video" | "carousel";
+              videoUrl?: string;
+              poster?: string;
+            }>((resolve) => {
+              const req = https.get(
+                `https://www.instagram.com/p/${shortcode}/embed/captioned/`,
+                { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }, timeout: 4000 },
+                (res) => {
+                  let html = "";
+                  res.on("data", (c) => (html += c));
+                  res.on("end", () => {
+                    const idx = html.indexOf("video_url");
+                    if (idx === -1) return resolve({ type: "carousel" });
+                    const mp4Idx = html.indexOf(".mp4", idx);
+                    if (mp4Idx === -1) return resolve({ type: "carousel" });
+                    const raw = html.slice(idx + 'video_url\\":\\"'.length, mp4Idx + 4);
+                    const clean = raw.replace(/\\\//g, "/").replace(/\\\\/g, "").replace(/^["\\]+|["\\]+$/g, "");
+                    const afterIdx = mp4Idx + 4;
+                    const endQuoteIdx = html.indexOf('\\"', afterIdx);
+                    const after = html.slice(afterIdx, endQuoteIdx);
+                    const cleanAfter = after.replace(/\\u0026/g, "&").replace(/\\u00253D/g, "%3D").replace(/\\\//g, "/").replace(/\\\\/g, "").replace(/^["\\]+|["\\]+$/g, "");
+                    const full = "https://" + clean.split("https://").pop() + cleanAfter;
+
+                    let poster: string | undefined = undefined;
+                    const imgIdx = html.indexOf("display_url");
+                    if (imgIdx !== -1) {
+                      const endImg = html.indexOf('\\"', imgIdx + 15);
+                      poster = html.slice(imgIdx + 14, endImg).replace(/\\\//g, "/").replace(/\\u0026/g, "&");
+                    }
+                    resolve({ type: "video", videoUrl: full, poster });
+                  });
+                },
+              );
+              req.on("error", () => resolve({ type: "carousel" }));
+              req.on("timeout", () => {
+                req.destroy();
+                resolve({ type: "carousel" });
+              });
+            });
+
+            if (fastResult.type === "video" && fastResult.videoUrl) {
+              const proxiedVideo = `/api/media/instagram/stream?url=${encodeURIComponent(fastResult.videoUrl)}`;
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  type: "video",
+                  videoUrl: proxiedVideo,
+                  rawVideoUrl: fastResult.videoUrl,
+                  imageUrl: fastResult.poster,
+                  shortcode,
+                }),
+                {
+                  status: 200,
+                  headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
+                },
+              );
+            }
+          } catch (fastErr) {
+            console.warn("[ssr-fast-instagram] error:", fastErr);
+          }
+        }
+
         try {
           const { createRequire } = await import("node:module");
           const requireLocal = createRequire(import.meta.url);

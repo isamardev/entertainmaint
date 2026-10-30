@@ -256,7 +256,7 @@ export const articleService = {
     if (input.title !== undefined && !input.title.trim()) {
       throw new Error("Article title cannot be empty.");
     }
-    if (input.dek !== undefined && !input.dek.trim()) {
+    if (input.dek !== undefined && input.dek !== null && !input.dek.trim()) {
       throw new Error("Article description (dek) cannot be empty.");
     }
     if (

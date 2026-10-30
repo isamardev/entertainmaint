@@ -190,15 +190,15 @@ function NotFound() {
   );
 }
 
-function ErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorBoundary({ error, reset }: { error: any; reset: () => void }) {
   useEffect(() => {
-    reportLovableError(error, { boundary: "root" });
+    if (error) reportLovableError(error, { boundary: "root" });
   }, [error]);
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4 text-center">
       <div>
         <div className="display text-3xl font-black uppercase">Something broke</div>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{error?.message || String(error)}</p>
         <button
           onClick={reset}
           className="mt-4 yellow-bar px-4 py-2 font-bold uppercase tracking-widest"

@@ -180,8 +180,7 @@ export async function adminApiRequest(
   if (
     !headers.has("Content-Type") &&
     init.body !== undefined &&
-    typeof init.body === "string" &&
-    !(init.body instanceof FormData)
+    typeof init.body === "string"
   ) {
     try {
       JSON.parse(init.body);

@@ -7,6 +7,7 @@ import {
   type Article,
 } from "@/services/articleService";
 import { getApiUrl } from "@/lib/api";
+import { extractInstagramShortcode, isInstagramReel } from "@/lib/instagram";
 import { toast } from "sonner";
 import {
   AlignCenter,
@@ -655,6 +656,7 @@ function RichTextEditor({
   const perFileProgressRef = useRef<Map<number, number>>(new Map());
   const uploadTokenRef = useRef(0);
   const attachedBtnsRef = useRef<Set<HTMLButtonElement>>(new Set());
+  const inventoryAllRef = useRef<() => void>(() => {});
 
   const savedRangeRef = useRef<Range | null>(null);
   const [linkModal, setLinkModal] = useState<{
@@ -686,7 +688,7 @@ function RichTextEditor({
     if (currentStripped !== valueStripped) {
       editorRef.current.innerHTML = value || "<p></p>";
       setTimeout(() => {
-        if (editorRef.current) inventoryAll();
+        if (editorRef.current) inventoryAllRef.current();
       }, 0);
     }
   }, [value]);
@@ -802,6 +804,8 @@ function RichTextEditor({
         wrapBareMedia(el);
       });
     }
+
+    inventoryAllRef.current = inventoryAll;
 
     function removeBlock(block: HTMLElement) {
       // Remove the full art-block wrapper (figure) - media + row go together
@@ -970,6 +974,17 @@ function RichTextEditor({
       }
       const clsMatch = cleanOpen.match(/class="([^"]*)"/i);
       const cls = clsMatch?.[1] || "";
+      if (/instagram-media/.test(cls)) {
+        const sc = extractInstagramShortcode(safeLink);
+        if (sc) {
+          const isReel = isInstagramReel(safeLink) || /reel/i.test(safeLink);
+          const maxWidth = isReel ? "380px" : "540px";
+          const iframeSrc = isReel
+            ? `https://www.instagram.com/reel/${sc}/embed/?autoplay=1&muted=1`
+            : `https://www.instagram.com/p/${sc}/embed/captioned/?autoplay=1&muted=1`;
+          return `<div class="instagram-embed-frame-wrap instagram-embed-slot w-full ${isReel ? "instagram-reel-wrap max-w-[380px]" : "max-w-[540px]"} mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-sm" data-instagram-shortcode="${sc}" data-instagram-is-reel="${isReel ? "true" : "false"}" style="width:100%; max-width:${maxWidth}; min-height:480px; overflow:visible;"><iframe class="instagram-official-iframe w-full block border-0 bg-white" src="${iframeSrc}" style="width:100%; max-width:${maxWidth}; min-height:480px; border:0; display:block; overflow:visible; background:#ffffff;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen" allowfullscreen allowtransparency="true" loading="lazy" title="Instagram Post"></iframe></div>`;
+        }
+      }
       let label = "View this post";
       if (/instagram-media/.test(cls)) label = "View this post on Instagram";
       else if (/twitter-tweet/.test(cls)) label = "View this post on X / Twitter";
@@ -1347,7 +1362,7 @@ function RichTextEditor({
       .sort((a, b) => a.index - b.index)
       .forEach((o) => {
         if (o.err) {
-          toast.error(o.err?.message ? o.err.message : `${o.file.name} upload failed`);
+          toast.error((o.err as any)?.message ? (o.err as any).message : `${o.file.name} upload failed`);
           return;
         }
         if (!o.done) return;
@@ -1437,17 +1452,25 @@ function RichTextEditor({
     if (host === "instagram.com" || host === "m.instagram.com" || host === "instagr.am") {
       const pathOnly = parsed.pathname.replace(/\/+$/, "") + "/";
       const isReel = pathOnly.startsWith("/reel/") || pathOnly.startsWith("/reels/");
-      const reelMatch = pathOnly.match(/^\/reels?\/([A-Za-z0-9_-]+)/i);
-      const shortcode = reelMatch ? reelMatch[1] : null;
+      const shortcode = extractInstagramShortcode(cleanUrl);
       const canonicalPath = shortcode ? `/p/${shortcode}/` : pathOnly;
       const cleanLink = `https://www.instagram.com${canonicalPath}`;
+      const maxWidth = isReel ? "380px" : "540px";
+      const iframeSrc = shortcode
+        ? isReel
+          ? `https://www.instagram.com/reel/${shortcode}/embed/?autoplay=1&muted=1`
+          : `https://www.instagram.com/p/${shortcode}/embed/captioned/?autoplay=1&muted=1`
+        : isReel
+          ? `https://www.instagram.com${pathOnly}embed/?autoplay=1&muted=1`
+          : `${cleanLink}embed/captioned/?autoplay=1&muted=1`;
+
       return {
         platform: isReel ? "Instagram Reel" : "Instagram Post",
         html:
-          `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full max-w-[540px] mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
-          `<blockquote class="instagram-media mx-auto" data-instgrm-captioned data-instgrm-permalink="${cleanLink}" data-instgrm-version="14" style="background:#FFFFFF; background-color:#FFFFFF; border:1px solid #e5e7eb; border-radius:12px; box-shadow:none; margin: 1px auto; max-width:540px; min-width:326px; min-height:0; padding:0; width:calc(100% - 2px); color-scheme:light;">` +
-          `<div style="padding:16px; background:#FFFFFF;"><a href="${cleanLink}" target="_blank" rel="noopener noreferrer" style="color:#000000; text-decoration:none; font-weight:600; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:14px;">View this post on Instagram</a></div>` +
-          `</blockquote></figure><p><br></p>`,
+          `<figure class="inline-embed my-8 flex flex-col items-center justify-center w-full mx-auto text-center bg-transparent" contenteditable="false" data-art-block="1">` +
+          `<div class="instagram-embed-frame-wrap instagram-embed-slot w-full ${isReel ? "instagram-reel-wrap max-w-[380px]" : "max-w-[540px]"} mx-auto flex flex-col items-center justify-start bg-white rounded-xl border border-gray-200 shadow-sm" data-instagram-shortcode="${shortcode || ""}" data-instagram-is-reel="${isReel ? "true" : "false"}" style="width:100%; max-width:${maxWidth}; min-height:480px; overflow:visible;">` +
+          `<iframe class="instagram-official-iframe w-full block border-0 bg-white" src="${iframeSrc}" style="width:100%; max-width:${maxWidth}; min-height:480px; border:0; display:block; overflow:visible; background:#ffffff;" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen" allowfullscreen allowtransparency="true" loading="lazy" title="Instagram Post"></iframe>` +
+          `</div></figure><p><br></p>`,
       };
     }
 

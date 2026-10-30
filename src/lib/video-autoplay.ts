@@ -1,20 +1,25 @@
 /**
- * Smart Viewport Scroll Autoplay & Auto-Pause for Videos
+ * Smart Viewport Scroll Autoplay & Auto-Pause for Videos & Embeds
  *
  * Requirements:
- * 1. When the user scrolls (up or down) and stops at a video, it auto-plays smoothly (muted).
+ * 1. When the user scrolls (up or down) and stops at a video/embed post, it auto-plays smoothly (muted).
  * 2. When the user scrolls past it (either scrolling up or scrolling down), it pauses immediately.
- * 3. Only the primary in-view video plays if multiple videos exist on the page.
- * 4. Works across desktop and mobile browsers while strictly respecting autoplay policies.
+ * 3. As the user reaches the next video/embed, that next video starts playing automatically.
+ * 4. Only the primary in-view video plays if multiple videos exist on the page ("assy he chlta rehy").
+ * 5. Works seamlessly across HTML5 <video> elements and iframe video embeds (YouTube, Vimeo, etc.).
  */
 
-interface VideoMetadata {
+export interface PlayableMediaItem {
+  id: string;
+  element: HTMLElement;
+  type: "video" | "youtube" | "vimeo" | "instagram" | "other";
+  play: () => void;
+  pause: () => void;
   isManuallyPaused: boolean;
   lastRatio: number;
 }
 
-const registeredVideos = new Set<HTMLVideoElement>();
-const videoMetadata = new WeakMap<HTMLVideoElement, VideoMetadata>();
+const registeredMedia = new Map<HTMLElement, PlayableMediaItem>();
 
 let sharedObserver: IntersectionObserver | null = null;
 let scrollStopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -22,6 +27,126 @@ let isScrollListening = false;
 let isTicking = false;
 let isUserScrolling = false;
 let userScrollTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function detectMediaType(el: HTMLElement): PlayableMediaItem["type"] {
+  if (el.tagName === "VIDEO") return "video";
+  if (el.tagName === "IFRAME") {
+    const src = (el.getAttribute("src") || "").toLowerCase();
+    if (src.includes("youtube.com") || src.includes("youtu.be") || src.includes("youtube-nocookie.com")) {
+      return "youtube";
+    }
+    if (src.includes("vimeo.com")) {
+      return "vimeo";
+    }
+    if (src.includes("instagram.com")) {
+      return "instagram";
+    }
+  }
+  return "other";
+}
+
+function createMediaController(el: HTMLElement, type: PlayableMediaItem["type"]): {
+  play: () => void;
+  pause: () => void;
+} {
+  if (type === "video" && el instanceof HTMLVideoElement) {
+    // Native HTML5 <video>
+    el.muted = true;
+    el.playsInline = true;
+    el.loop = true;
+    el.setAttribute("muted", "");
+    el.setAttribute("playsinline", "");
+    el.setAttribute("loop", "");
+
+    return {
+      play: () => {
+        el.muted = true;
+        if (el.paused) {
+          el.play().catch(() => {});
+        }
+      },
+      pause: () => {
+        if (!el.paused) {
+          el.pause();
+        }
+      },
+    };
+  }
+
+  if (type === "youtube" && el instanceof HTMLIFrameElement) {
+    // Ensure enablejsapi=1 is on YouTube iframe
+    try {
+      const src = el.src;
+      if (src && !src.includes("enablejsapi=1")) {
+        el.src = `${src}${src.includes("?") ? "&" : "?"}enablejsapi=1`;
+      }
+    } catch {}
+
+    return {
+      play: () => {
+        try {
+          el.contentWindow?.postMessage(
+            JSON.stringify({ event: "command", func: "mute", args: [] }),
+            "*",
+          );
+          el.contentWindow?.postMessage(
+            JSON.stringify({ event: "command", func: "playVideo", args: [] }),
+            "*",
+          );
+        } catch {}
+      },
+      pause: () => {
+        try {
+          el.contentWindow?.postMessage(
+            JSON.stringify({ event: "command", func: "pauseVideo", args: [] }),
+            "*",
+          );
+        } catch {}
+      },
+    };
+  }
+
+  if (type === "vimeo" && el instanceof HTMLIFrameElement) {
+    return {
+      play: () => {
+        try {
+          el.contentWindow?.postMessage(JSON.stringify({ method: "setVolume", value: 0 }), "*");
+          el.contentWindow?.postMessage(JSON.stringify({ method: "play" }), "*");
+        } catch {}
+      },
+      pause: () => {
+        try {
+          el.contentWindow?.postMessage(JSON.stringify({ method: "pause" }), "*");
+        } catch {}
+      },
+    };
+  }
+
+  if (type === "instagram" && el instanceof HTMLIFrameElement) {
+    return {
+      play: () => {
+        try {
+          el.contentWindow?.postMessage(JSON.stringify({ type: "PLAY" }), "*");
+          el.contentWindow?.postMessage(JSON.stringify({ method: "play" }), "*");
+          el.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "playVideo" }), "*");
+        } catch {}
+      },
+      pause: () => {
+        try {
+          el.contentWindow?.postMessage(JSON.stringify({ type: "PAUSE" }), "*");
+          el.contentWindow?.postMessage(JSON.stringify({ method: "pause" }), "*");
+          el.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo" }), "*");
+        } catch {}
+      },
+    };
+  }
+
+  // Fallback for other iframes (e.g. reset on offscreen if needed)
+  return {
+    play: () => {},
+    pause: () => {},
+  };
+}
 
 function getSharedObserver(): IntersectionObserver | null {
   if (typeof window === "undefined" || typeof IntersectionObserver === "undefined") {
@@ -31,19 +156,15 @@ function getSharedObserver(): IntersectionObserver | null {
     sharedObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          const video = entry.target as HTMLVideoElement;
-          const meta = videoMetadata.get(video);
-          if (meta) {
-            meta.lastRatio = entry.intersectionRatio;
-          }
+          const item = registeredMedia.get(entry.target as HTMLElement);
+          if (!item) return;
+
+          item.lastRatio = entry.intersectionRatio;
 
           // If scrolled out of view or less than 20% visible, pause immediately
           if (!entry.isIntersecting || entry.intersectionRatio < 0.2) {
-            pauseVideoSafely(video);
-            if (meta) {
-              // Reset manual pause once user leaves the video so it can play again on return
-              meta.isManuallyPaused = false;
-            }
+            item.pause();
+            item.isManuallyPaused = false;
           } else if (entry.intersectionRatio >= 0.35) {
             // Video entered visible zone: schedule active video evaluation
             scheduleEvaluate();
@@ -58,21 +179,30 @@ function getSharedObserver(): IntersectionObserver | null {
   return sharedObserver;
 }
 
-export function calculateVideoVisibility(video: HTMLVideoElement) {
-  if (!video || typeof window === "undefined" || !document.body.contains(video)) {
-    return { visibleRatio: 0, centerDistance: Infinity, inViewport: false };
+export function calculateElementVisibility(el: HTMLElement) {
+  if (!el || typeof window === "undefined" || !document.body.contains(el)) {
+    return { visibleRatio: 0, visibleHeight: 0, centerDistance: Infinity, inViewport: false };
   }
 
-  const rect = video.getBoundingClientRect();
+  let rect = el.getBoundingClientRect();
   const vh = window.innerHeight || document.documentElement.clientHeight || 800;
 
+  // If the video element itself has 0 dimensions (e.g. while loading metadata/sources),
+  // use its parent container's bounding box so it is detected as in-view.
+  if ((rect.height <= 0 || rect.width <= 0) && el.parentElement) {
+    const parentRect = el.parentElement.getBoundingClientRect();
+    if (parentRect.height > 0 && parentRect.width > 0) {
+      rect = parentRect;
+    }
+  }
+
   if (rect.height <= 0 || rect.width <= 0) {
-    return { visibleRatio: 0, centerDistance: Infinity, inViewport: false };
+    return { visibleRatio: 0, visibleHeight: 0, centerDistance: Infinity, inViewport: false };
   }
 
   // Completely outside viewport
   if (rect.bottom <= 0 || rect.top >= vh) {
-    return { visibleRatio: 0, centerDistance: Infinity, inViewport: false };
+    return { visibleRatio: 0, visibleHeight: 0, centerDistance: Infinity, inViewport: false };
   }
 
   const visibleTop = Math.max(0, rect.top);
@@ -80,58 +210,32 @@ export function calculateVideoVisibility(video: HTMLVideoElement) {
   const visibleHeight = Math.max(0, visibleBottom - visibleTop);
   const visibleRatio = visibleHeight / rect.height;
 
-  const videoCenterY = rect.top + rect.height / 2;
+  const elementCenterY = rect.top + rect.height / 2;
   const viewportCenterY = vh / 2;
-  const centerDistance = Math.abs(videoCenterY - viewportCenterY);
+  const centerDistance = Math.abs(elementCenterY - viewportCenterY);
 
   return {
     visibleRatio,
+    visibleHeight,
     centerDistance,
     inViewport: visibleRatio > 0,
     rect,
   };
 }
 
-export function playVideoSafely(video: HTMLVideoElement) {
-  if (!video || !document.body.contains(video)) return;
-
-  // Always ensure autoplay compliance: muted, playsinline, loop
-  video.muted = true;
-  video.playsInline = true;
-  if (!video.hasAttribute("muted")) video.setAttribute("muted", "");
-  if (!video.hasAttribute("playsinline")) video.setAttribute("playsinline", "");
-  if (!video.hasAttribute("loop")) video.setAttribute("loop", "");
-
-  if (video.paused) {
-    const playPromise = video.play();
-    if (playPromise !== undefined) {
-      playPromise.catch((err) => {
-        // If sound permission issue, force mute and retry
-        if (err?.name === "NotAllowedError" && !video.muted) {
-          video.muted = true;
-          video.play().catch(() => {});
-        }
-      });
-    }
-  }
-}
-
-export function pauseVideoSafely(video: HTMLVideoElement) {
-  if (!video) return;
-  if (!video.paused) {
-    video.pause();
-  }
-}
+// Backward compatible helper
+export const calculateVideoVisibility = calculateElementVisibility;
 
 export function pauseAllVideos() {
-  registeredVideos.forEach((vid) => {
-    pauseVideoSafely(vid);
+  registeredMedia.forEach((item) => {
+    item.pause();
   });
 }
 
 /**
- * Evaluates all registered videos and plays the single best in-view video
- * while pausing any other videos.
+ * Evaluates all registered media items and plays the single best in-view item
+ * (the one closest to vertical center of viewport), while pausing any others.
+ * As user scrolls, the active video pauses and the next one automatically plays.
  */
 export function evaluateActiveVideo() {
   if (typeof document === "undefined" || document.hidden) {
@@ -139,37 +243,54 @@ export function evaluateActiveVideo() {
     return;
   }
 
-  if (registeredVideos.size === 0) return;
+  if (registeredMedia.size === 0) return;
 
-  let bestVideo: HTMLVideoElement | null = null;
+  const vh = window.innerHeight || document.documentElement.clientHeight || 800;
+  let bestItem: PlayableMediaItem | null = null;
   let minDistance = Infinity;
 
-  registeredVideos.forEach((vid) => {
-    if (!document.body.contains(vid)) return;
-    const meta = videoMetadata.get(vid);
-    const vis = calculateVideoVisibility(vid);
+  registeredMedia.forEach((item) => {
+    if (!document.body.contains(item.element)) return;
+    const vis = calculateElementVisibility(item.element);
 
-    // If scrolled out of view, pause and reset manual pause flag
-    if (vis.visibleRatio < 0.2 || !vis.inViewport) {
-      if (meta) meta.isManuallyPaused = false;
-      pauseVideoSafely(vid);
+    // If scrolled out of view or less than 15% visible and far from center, reset manual pause flag
+    if (!vis.inViewport || vis.visibleRatio < 0.15 || vis.centerDistance > vh * 0.6) {
+      item.isManuallyPaused = false;
+      item.pause();
       return;
     }
 
-    // Video is a valid active candidate if at least 35% visible and user didn't manually pause it
-    if (vis.visibleRatio >= 0.35 && (!meta || !meta.isManuallyPaused)) {
+    // Video is a valid candidate if reasonably near viewport center and not manually paused
+    const inCenterZone = vis.centerDistance < Math.max(vh * 0.48, 360);
+    const hasGoodVisibility = vis.visibleRatio >= 0.2 || vis.visibleHeight >= 120;
+
+    if (inCenterZone && hasGoodVisibility && !item.isManuallyPaused) {
       if (vis.centerDistance < minDistance) {
         minDistance = vis.centerDistance;
-        bestVideo = vid;
+        bestItem = item;
       }
     }
   });
 
-  registeredVideos.forEach((vid) => {
-    if (vid === bestVideo) {
-      playVideoSafely(vid);
+  // Fallback: if no video is in center zone but a video is well visible in viewport and only candidate
+  if (!bestItem) {
+    registeredMedia.forEach((item) => {
+      if (!document.body.contains(item.element) || item.isManuallyPaused) return;
+      const vis = calculateElementVisibility(item.element);
+      if (vis.inViewport && (vis.visibleRatio >= 0.35 || vis.visibleHeight >= 180)) {
+        if (vis.centerDistance < minDistance) {
+          minDistance = vis.centerDistance;
+          bestItem = item;
+        }
+      }
+    });
+  }
+
+  registeredMedia.forEach((item) => {
+    if (item === bestItem) {
+      item.play();
     } else {
-      pauseVideoSafely(vid);
+      item.pause();
     }
   });
 }
@@ -178,7 +299,7 @@ function scheduleEvaluate() {
   if (scrollStopTimer) clearTimeout(scrollStopTimer);
   scrollStopTimer = setTimeout(() => {
     evaluateActiveVideo();
-  }, 90);
+  }, 40);
 }
 
 function handleWindowScroll() {
@@ -186,18 +307,18 @@ function handleWindowScroll() {
   if (userScrollTimeout) clearTimeout(userScrollTimeout);
   userScrollTimeout = setTimeout(() => {
     isUserScrolling = false;
-  }, 140);
+  }, 80);
 
-  // Immediate check during scroll: if a playing video moves out of view, pause it right away
+  // Immediate check during scroll: if playing item leaves viewport, pause right away
   if (!isTicking) {
     window.requestAnimationFrame(() => {
-      registeredVideos.forEach((vid) => {
-        if (!vid.paused) {
-          const vis = calculateVideoVisibility(vid);
-          // If less than 25% visible or gone past viewport borders, pause immediately
-          if (vis.visibleRatio < 0.25 || !vis.inViewport) {
-            pauseVideoSafely(vid);
-          }
+      const vh = window.innerHeight || 800;
+      registeredMedia.forEach((item) => {
+        const vis = calculateElementVisibility(item.element);
+        // If less than 20% visible or far from viewport center, pause immediately
+        if (!vis.inViewport || vis.visibleRatio < 0.18 || vis.centerDistance > vh * 0.58) {
+          item.pause();
+          item.isManuallyPaused = false;
         }
       });
       isTicking = false;
@@ -205,11 +326,11 @@ function handleWindowScroll() {
     isTicking = true;
   }
 
-  // When scrolling stops / settles: auto-play where the user stopped
+  // When scroll settles: auto-play the video that is now centered in view
   if (scrollStopTimer) clearTimeout(scrollStopTimer);
   scrollStopTimer = setTimeout(() => {
     evaluateActiveVideo();
-  }, 110);
+  }, 50);
 }
 
 function handleScrollEnd() {
@@ -230,16 +351,28 @@ function ensureGlobalScrollListeners() {
 
   window.addEventListener("scroll", handleWindowScroll, { passive: true });
   window.addEventListener("scrollend" as any, handleScrollEnd, { passive: true });
+  window.addEventListener("touchmove", handleWindowScroll, { passive: true });
+  window.addEventListener("touchend", scheduleEvaluate, { passive: true });
   window.addEventListener("resize", scheduleEvaluate, { passive: true });
   document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  // Unlock playback on first user touch/click/scroll anywhere on page
+  const unlock = () => {
+    evaluateActiveVideo();
+  };
+  window.addEventListener("click", unlock, { once: true, passive: true });
+  window.addEventListener("touchstart", unlock, { once: true, passive: true });
+  window.addEventListener("wheel", unlock, { once: true, passive: true });
 }
 
 function teardownGlobalScrollListenersIfEmpty() {
-  if (registeredVideos.size > 0 || !isScrollListening || typeof window === "undefined") return;
+  if (registeredMedia.size > 0 || !isScrollListening || typeof window === "undefined") return;
   isScrollListening = false;
 
   window.removeEventListener("scroll", handleWindowScroll);
   window.removeEventListener("scrollend" as any, handleScrollEnd);
+  window.removeEventListener("touchmove", handleWindowScroll);
+  window.removeEventListener("touchend", scheduleEvaluate);
   window.removeEventListener("resize", scheduleEvaluate);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
 
@@ -254,97 +387,151 @@ function teardownGlobalScrollListenersIfEmpty() {
 }
 
 /**
- * Register a video element to participate in smart viewport scroll autoplay.
- * Returns an unregister cleanup function.
+ * Register any playable media element (HTML5 <video> or video <iframe>)
+ * to participate in smart viewport scroll autoplay and auto-pause.
  */
-export function registerScrollAutoPlay(video: HTMLVideoElement): () => void {
-  if (!video) return () => {};
+export function registerPlayableMedia(element: HTMLElement): () => void {
+  if (!element || registeredMedia.has(element)) return () => {};
 
-  registeredVideos.add(video);
-  videoMetadata.set(video, {
+  const type = detectMediaType(element);
+  const controller = createMediaController(element, type);
+
+  let isProgrammatic = false;
+  const safePause = () => {
+    isProgrammatic = true;
+    controller.pause();
+    setTimeout(() => {
+      isProgrammatic = false;
+    }, 150);
+  };
+
+  const safePlay = () => {
+    controller.play();
+  };
+
+  const item: PlayableMediaItem = {
+    id: `media-${Math.random().toString(36).slice(2, 9)}`,
+    element,
+    type,
+    play: safePlay,
+    pause: safePause,
     isManuallyPaused: false,
     lastRatio: 0,
-  });
+  };
 
-  // Ensure attributes for autoplay policy
-  video.muted = true;
-  video.playsInline = true;
-  video.loop = true;
-  video.setAttribute("muted", "");
-  video.setAttribute("playsinline", "");
-  video.setAttribute("loop", "");
+  registeredMedia.set(element, item);
 
-  const handlePause = () => {
-    // If paused by user click while still in view and not during active scrolling
-    const meta = videoMetadata.get(video);
-    if (meta && !isUserScrolling) {
-      const vis = calculateVideoVisibility(video);
-      if (vis.visibleRatio >= 0.4) {
-        meta.isManuallyPaused = true;
+  if (element instanceof HTMLVideoElement) {
+    // Track genuine user click on controls to pause
+    let userTappedControls = false;
+    const handlePointerDown = () => {
+      userTappedControls = true;
+      setTimeout(() => {
+        userTappedControls = false;
+      }, 500);
+    };
+
+    const handlePause = () => {
+      if (isProgrammatic) return;
+      // ONLY respect pause as manual if the user actually tapped on the video controls
+      if (userTappedControls) {
+        item.isManuallyPaused = true;
       }
-    }
-  };
+    };
+    const handlePlay = () => {
+      item.isManuallyPaused = false;
+    };
 
-  const handlePlay = () => {
-    const meta = videoMetadata.get(video);
-    if (meta) {
-      meta.isManuallyPaused = false;
-    }
-  };
-
-  const handleLoadedData = () => {
-    scheduleEvaluate();
-  };
-
-  video.addEventListener("pause", handlePause);
-  video.addEventListener("play", handlePlay);
-  video.addEventListener("loadeddata", handleLoadedData);
+    element.addEventListener("pointerdown", handlePointerDown, { passive: true });
+    element.addEventListener("pause", handlePause);
+    element.addEventListener("play", handlePlay);
+    element.addEventListener("loadeddata", scheduleEvaluate);
+    element.addEventListener("loadedmetadata", scheduleEvaluate);
+    element.addEventListener("canplay", scheduleEvaluate);
+  }
 
   ensureGlobalScrollListeners();
 
   const observer = getSharedObserver();
   if (observer) {
-    observer.observe(video);
+    observer.observe(element);
   }
 
-  // Initial check
   scheduleEvaluate();
 
   return () => {
-    video.removeEventListener("pause", handlePause);
-    video.removeEventListener("play", handlePlay);
-    video.removeEventListener("loadeddata", handleLoadedData);
-
+    item.pause();
     if (observer) {
-      observer.unobserve(video);
+      observer.unobserve(element);
     }
-    registeredVideos.delete(video);
+    registeredMedia.delete(element);
     teardownGlobalScrollListenersIfEmpty();
   };
 }
 
+// Backward-compatible alias for <video> elements
+export function registerScrollAutoPlay(video: HTMLVideoElement): () => void {
+  return registerPlayableMedia(video);
+}
+
+export function playVideoSafely(video: HTMLVideoElement) {
+  const item = registeredMedia.get(video);
+  if (item) {
+    item.play();
+  } else {
+    video.muted = true;
+    video.playsInline = true;
+    video.play().catch(() => {});
+  }
+}
+
+export function pauseVideoSafely(video: HTMLVideoElement) {
+  const item = registeredMedia.get(video);
+  if (item) {
+    item.pause();
+  } else {
+    video.pause();
+  }
+}
+
 /**
- * Automatically scan a container (e.g. article prose body) and register all video elements.
+ * Automatically scan a container (article body, embedded post, etc.)
+ * and register all video elements and playable iframes for scroll autoplay.
  */
 export function initArticleVideoAutoPlay(container: HTMLElement): () => void {
   if (!container || typeof window === "undefined") return () => {};
 
   const cleanups: Array<() => void> = [];
 
-  const attachToVideos = () => {
+  const attachToElements = () => {
+    // 1. Scan native HTML5 <video> elements
     const videos = container.querySelectorAll<HTMLVideoElement>("video");
     videos.forEach((vid) => {
-      if (!registeredVideos.has(vid)) {
-        cleanups.push(registerScrollAutoPlay(vid));
+      if (!registeredMedia.has(vid)) {
+        cleanups.push(registerPlayableMedia(vid));
+      }
+    });
+
+    // 2. Scan playable iframes (YouTube, Vimeo, etc.)
+    const iframes = container.querySelectorAll<HTMLIFrameElement>("iframe");
+    iframes.forEach((ifr) => {
+      const src = (ifr.getAttribute("src") || "").toLowerCase();
+      const isPlayable =
+        src.includes("youtube.com") ||
+        src.includes("youtu.be") ||
+        src.includes("vimeo.com") ||
+        src.includes("instagram.com") ||
+        src.includes("facebook.com/plugins/video");
+      if (isPlayable && !registeredMedia.has(ifr)) {
+        cleanups.push(registerPlayableMedia(ifr));
       }
     });
   };
 
-  attachToVideos();
+  attachToElements();
 
-  // Also observe DOM mutations inside the container (e.g. hydrated Instagram embed videos)
   const mutationObserver = new MutationObserver(() => {
-    attachToVideos();
+    attachToElements();
   });
 
   mutationObserver.observe(container, {

@@ -26,7 +26,9 @@ export const Route = createFileRoute("/category/$slug")({
     links: loaderData ? [{ rel: "canonical", href: `/category/${loaderData.category.slug}` }] : [],
   }),
   component: CategoryPage,
-  errorComponent: ({ error }) => <div className="p-8 text-center">{error.message}</div>,
+  errorComponent: ({ error }: { error: any }) => (
+    <div className="p-8 text-center">{error?.message || "An error occurred"}</div>
+  ),
   notFoundComponent: () => <div className="p-8 text-center">Category not found.</div>,
 });
 

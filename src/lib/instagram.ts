@@ -11,11 +11,29 @@ export function extractInstagramShortcode(url?: string | null): string | null {
   return match && match[1] ? match[1] : null;
 }
 
+export function isInstagramReel(url?: string | null): boolean {
+  if (!url) return false;
+  return /\/(?:reel|reels)\/([A-Za-z0-9_-]+)/i.test(url);
+}
+
+export function getInstagramEmbedUrl(url?: string | null): string {
+  const shortcode = extractInstagramShortcode(url);
+  if (!shortcode) return "";
+  const isReel = isInstagramReel(url);
+  if (isReel) {
+    return `https://www.instagram.com/reel/${shortcode}/embed/?autoplay=1&muted=1`;
+  }
+  return `https://www.instagram.com/p/${shortcode}/embed/captioned/?autoplay=1&muted=1`;
+}
+
 export function normalizeInstagramUrl(url?: string | null): string {
   if (!url) return "";
   const shortcode = extractInstagramShortcode(url);
   if (shortcode) {
-    return `https://www.instagram.com/p/${shortcode}/`;
+    const isReel = isInstagramReel(url);
+    return isReel
+      ? `https://www.instagram.com/reel/${shortcode}/`
+      : `https://www.instagram.com/p/${shortcode}/`;
   }
   return url.trim().replace(/^[`"']+|[`"']+$/g, "");
 }
