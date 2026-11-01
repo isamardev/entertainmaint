@@ -579,6 +579,26 @@ function formatArticleBody(body: string) {
     },
   );
 
+  // 3b. Ensure any naked or standalone instagram iframes are enclosed in official centered responsive figures
+  enriched = enriched.replace(
+    /(?:<figure(?!\s*class="[^"]*instagram)[^>]*>\s*(?:<div(?!\s*class="[^"]*instagram)[^>]*>)?\s*)?(<iframe\b[^>]*class="[^"]*instagram-official-iframe[^"]*"[\s\S]*?<\/iframe>)(?:\s*<\/div>)?(?:\s*<\/figure>)?/gi,
+    (fullMatch, iframeTag) => {
+      if (
+        fullMatch.includes("instagram-carousel-wrap") ||
+        fullMatch.includes("instagram-embed-frame-wrap") ||
+        fullMatch.includes("instagram-carousel-figure")
+      ) {
+        return fullMatch;
+      }
+      const srcMatch = iframeTag.match(/\ssrc="([^"]+)"/i) || iframeTag.match(/\ssrc='([^']+)'/i);
+      const src = srcMatch ? srcMatch[1].trim() : "";
+      const shortcode = extractInstagramShortcode(src);
+      const isReel = isInstagramReel(src) || /\/reels?\/[A-Za-z0-9_-]+/i.test(src);
+      const maxWidth = isReel ? "380px" : "540px";
+      return `<figure class="instagram-carousel-figure my-8 flex flex-col items-center justify-center w-full mx-auto bg-transparent"><div class="instagram-carousel-wrap instagram-embed-slot w-full ${isReel ? "instagram-reel-wrap max-w-[380px]" : "max-w-[540px]"} mx-auto flex flex-col items-center justify-start bg-white rounded-xl shadow-xs border border-neutral-200" data-instagram-shortcode="${shortcode || ""}" data-instagram-url="${src}" data-instagram-is-reel="${isReel ? "true" : "false"}" style="width:100%;max-width:${maxWidth};min-height:480px;overflow:visible;">${iframeTag}</div></figure>`;
+    },
+  );
+
   // Wrap known inline social embed blockquotes in responsive, correctly sized centered figures (Twitter, Facebook)
   const embedBQRe =
     /<figure[^>]*>\s*(<blockquote\b[^>]*class="[^"]*(?:twitter-tweet|fb-post|fb-video)[^"]*"[^>]*>[\s\S]*?<\/blockquote>)\s*<\/figure>/gi;

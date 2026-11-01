@@ -631,12 +631,14 @@ section:has(.social-embed-media-wrapper) {
 .instagram-carousel-wrap,
 .instagram-embed-frame-wrap,
 .instagram-embed-slot,
-div:has(> iframe.instagram-official-iframe),
-div:has(> iframe[src*="instagram.com"]) {
+div:not(.article-body):not(.prose):not([class*="max-w-"]):has(> iframe.instagram-official-iframe),
+div:not(.article-body):not(.prose):not([class*="max-w-"]):has(> iframe[src*="instagram.com"]) {
   min-height: 480px;
   max-height: none !important;
   width: 100% !important;
   max-width: 540px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
   overflow: visible !important;
   display: flex !important;
   flex-direction: column !important;
@@ -649,8 +651,8 @@ div:has(> iframe[src*="instagram.com"]) {
 .instagram-embed-frame-wrap[data-instagram-is-reel="true"],
 div[data-instagram-is-reel="true"],
 .instagram-reel-wrap,
-div:has(> iframe[src*="/reel/"]),
-div:has(> iframe[src*="/reels/"]) {
+div:not(.article-body):not(.prose):has(> iframe[src*="/reel/"]),
+div:not(.article-body):not(.prose):has(> iframe[src*="/reels/"]) {
   max-width: 380px !important;
 }
 
@@ -659,8 +661,33 @@ iframe[src*="instagram.com"] {
   min-height: 480px;
   max-height: none !important;
   width: 100% !important;
+  max-width: 540px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
   border: 0 !important;
   display: block !important;
+}
+
+iframe.instagram-official-iframe[src*="/reel/"],
+iframe.instagram-official-iframe[src*="/reels/"],
+iframe[src*="instagram.com/reel/"],
+iframe[src*="instagram.com/reels/"] {
+  max-width: 380px !important;
+}
+
+/* Article body and prose containers must never be shrunk or constrained by inner embeds */
+.article-body,
+.article-body.prose,
+div.article-body {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block !important;
+}
+
+.article-body iframe,
+.prose iframe {
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 .instagram-carousel-figure,
@@ -672,6 +699,13 @@ figure:has(.instagram-embed-frame-wrap) {
   max-height: none !important;
   height: auto !important;
   overflow: visible !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 /* Instagram raw media: hug video dimensions, zero black pillarboxing, clean transparent canvas */
